@@ -6,7 +6,7 @@ C++ program that fetches Linux system information, CPU details, and memory usage
 - `main.cpp` - Entry point and user menu
 - `sys_info.cpp` - System info parsing implementation
 - `sys_info.hpp` - Header file
-- `Makefile` - Build instructions
+- `Makefile` - Build instructions (`g++ -std=c++17`)
 
 ## Compilation and Execution
 ```bash
