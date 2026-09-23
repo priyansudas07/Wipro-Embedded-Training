@@ -1,24 +1,7 @@
-# Wipro Embedded Training - Assignments
+# Wipro Embedded Training
 
-Repository for Wipro COE Embedded Systems training assignments and lab projects.
+Assignments and projects for Wipro COE Embedded Systems training.
 
-## Project Structure
+## Folders
 
-- `Wipro Training Project.md` - Overall training project documentation.
-- `wipro_system_info_tool/` - Assignment 1: Linux System Information Tool in C.
-- `wipro_process_monitor/` - Assignment 2: Linux Process Monitor in C.
-- `wipro_system_resource_monitor/` - Assignment 3: Linux System Resource Monitor in C++.
-
-## How to Build and Run
-
-Navigate into any assignment directory and run:
-
-```bash
-make
-```
-
-To clean up object files and binaries:
-
-```bash
-make clean
-```
+- [`Wipro Training Project/`](./Wipro%20Training%20Project) - Main project directory containing all completed lab assignments.
