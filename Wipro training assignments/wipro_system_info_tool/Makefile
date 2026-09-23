@@ -1,16 +1,16 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -std=c99
+CXX = g++
+CXXFLAGS = -Wall -Wextra -std=c++17
 TARGET = sysinfo_tool
-SRCS = main.c sys_info.c
-OBJS = $(SRCS:.c=.o)
+SRCS = main.cpp sys_info.cpp
+OBJS = $(SRCS:.cpp=.o)
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS)
 
-%.o: %.c sys_info.h
-	$(CC) $(CFLAGS) -c $< -o $@
+%.o: %.cpp sys_info.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
 	rm -f $(OBJS) $(TARGET)
