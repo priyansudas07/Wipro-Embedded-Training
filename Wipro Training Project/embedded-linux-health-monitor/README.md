@@ -3,6 +3,14 @@
 ## Objective
 Build a C++ program that runs on Linux continuously in the background and behaves like a health supervisor for the device. The program monitors the Linux system and automatically reacts when something becomes unhealthy.
 
+---
+
+## 📊 Live Execution Output & Health Dashboard
+
+![Embedded Linux Device Health Dashboard](./docs/dashboard_screenshot.png)
+
+---
+
 ## Monitored Health Metrics (6 System Monitors)
 1. **CPU Usage**: Measures total CPU load percentage.
 2. **RAM Usage**: Monitors Total, Free, and Used memory.
@@ -52,7 +60,8 @@ embedded-linux-health-monitor/
 │   └── test_service_monitor.cpp
 └── docs/
     ├── architecture.md
-    └── test-report.md
+    ├── test-report.md
+    └── dashboard_screenshot.png
 ```
 
 ---

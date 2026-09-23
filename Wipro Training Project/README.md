@@ -9,6 +9,9 @@ Main folder for Wipro COE Embedded Systems training projects.
 #### Objective
 Build a C++ program that runs on Linux continuously in the background and behaves like a health supervisor for the device. The program monitors the Linux system and automatically reacts when something becomes unhealthy.
 
+#### Live Execution Dashboard Screenshot
+![Embedded Linux Device Health Dashboard](./embedded-linux-health-monitor/docs/dashboard_screenshot.png)
+
 #### Monitored System Metrics (6 Health Monitors):
 1. **CPU Usage**: Real-time `/proc/stat` CPU load computation.
 2. **RAM Usage**: Memory & Swap utilization monitoring (`/proc/meminfo`, `sysinfo()`).
