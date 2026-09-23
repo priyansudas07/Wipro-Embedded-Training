@@ -1,8 +1,19 @@
 # Embedded Linux Device Health Monitor & Auto-Recovery Agent
 
-C++17 production-style daemon for monitoring system metrics (CPU, RAM, disk, temperature, network) and executing automated service recovery on Embedded Linux edge devices.
+## Objective
+Build a C++ program that runs on Linux continuously in the background and behaves like a health supervisor for the device. The program monitors the Linux system and automatically reacts when something becomes unhealthy.
 
-## Project Structure
+## Monitored Health Metrics (6 System Monitors)
+1. **CPU Usage**: Measures total CPU load percentage.
+2. **RAM Usage**: Monitors Total, Free, and Used memory.
+3. **Disk Usage**: Tracks disk space utilization on mounted file systems.
+4. **CPU/System Temperature**: Reads system thermal zone sensors.
+5. **Network Status**: Monitors network interface traffic (RX/TX) and connectivity.
+6. **Critical Linux Service/Process**: Monitors system processes/services and triggers automated service recovery if inactive.
+
+---
+
+## Project Directory Structure
 
 ```text
 embedded-linux-health-monitor/
@@ -44,7 +55,9 @@ embedded-linux-health-monitor/
     └── test-report.md
 ```
 
-## Quick Start
+---
+
+## Build & Execution Instructions
 
 ### Build with CMake
 ```bash
@@ -62,9 +75,4 @@ ctest --output-on-failure
 ### Run Health Monitor Daemon
 ```bash
 ./build/health_monitor config/health_monitor.json
-```
-
-### Run Failure Simulation Script
-```bash
-./scripts/simulate_failure.sh
 ```
