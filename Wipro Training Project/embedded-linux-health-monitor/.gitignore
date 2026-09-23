@@ -1,0 +1,9 @@
+build/
+*.o
+*.log
+process_report.txt
+health_monitor
+test_cpu
+test_memory
+test_config
+test_service_monitor

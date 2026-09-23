@@ -1,0 +1,13 @@
+{
+  "cpu_threshold_pct": 85.0,
+  "memory_threshold_pct": 90.0,
+  "disk_threshold_pct": 90.0,
+  "temperature_threshold_celsius": 75.0,
+  "poll_interval_seconds": 2,
+  "log_file_path": "health_monitor.log",
+  "monitored_services": [
+    "cron",
+    "dbus",
+    "rsyslog"
+  ]
+}
