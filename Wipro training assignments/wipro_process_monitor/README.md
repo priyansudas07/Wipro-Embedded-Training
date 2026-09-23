@@ -4,19 +4,16 @@ C++ program utilizing `<filesystem>`, `<iostream>`, and `<vector>` to list runni
 
 ---
 
-## 📊 Execution Output Screenshots
+## 📊 Program Execution Screenshots
 
-### Full System & Hardware Summary
-![Full System Summary](./docs/full_summary.png)
+### 1. Show Process Details (Option 1)
+![Process Details](./docs/proc_list.png)
 
-### System Information Output
-![System Information](./docs/sys_info.png)
+### 2. Search Process by Name or PID (Option 2)
+![Process Search](./docs/proc_search.png)
 
-### CPU Information Output
-![CPU Information](./docs/cpu_info.png)
-
-### Memory Information Output
-![Memory Information](./docs/memory_info.png)
+### 3. View Process Statistics Summary (Option 3)
+![Process Statistics Summary](./docs/proc_stats.png)
 
 ---
 
