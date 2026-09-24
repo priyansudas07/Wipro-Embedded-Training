@@ -1,0 +1,10 @@
+[Service]
+Name = logger_service
+Command = /bin/sleep 60
+RestartPolicy = always
+
+[Service]
+Name = demo_app
+Command = /bin/sleep 30
+Dependencies = logger_service
+RestartPolicy = on-failure

@@ -1,0 +1,8 @@
+# Build directory
+build/
+bin/
+
+# Temporary and log files
+*.log
+*.sock
+test_cli.sh
