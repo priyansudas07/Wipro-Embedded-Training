@@ -16,6 +16,8 @@ void daemonSignalHandler(int signum) {
 int main(int argc, char* argv[]) {
     signal(SIGINT, daemonSignalHandler);
     signal(SIGTERM, daemonSignalHandler);
+    signal(SIGHUP, SIG_IGN);
+    signal(SIGPIPE, SIG_IGN);
 
     std::string config_file = "configs/demo.service";
     if (argc > 1) {
