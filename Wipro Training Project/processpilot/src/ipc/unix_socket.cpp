@@ -11,6 +11,8 @@ UnixSocketServer::~UnixSocketServer() {
     if (!socket_path_.empty()) unlink(socket_path_.c_str());
 }
 
+#include <sys/stat.h>
+
 bool UnixSocketServer::init(const std::string& socket_path) {
     socket_path_ = socket_path;
     unlink(socket_path_.c_str());
@@ -29,6 +31,7 @@ bool UnixSocketServer::init(const std::string& socket_path) {
     std::strncpy(addr.sun_path, socket_path_.c_str(), sizeof(addr.sun_path) - 1);
 
     if (bind(server_fd_, (struct sockaddr*)&addr, sizeof(addr)) < 0) return false;
+    chmod(socket_path_.c_str(), 0777);
     if (listen(server_fd_, 5) < 0) return false;
 
     return true;
