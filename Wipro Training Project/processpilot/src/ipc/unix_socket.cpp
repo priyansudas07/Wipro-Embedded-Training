@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <cstring>
 #include <iostream>
 
@@ -17,6 +18,11 @@ bool UnixSocketServer::init(const std::string& socket_path) {
     server_fd_ = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server_fd_ < 0) return false;
 
+    int flags = fcntl(server_fd_, F_GETFL, 0);
+    if (flags >= 0) {
+        fcntl(server_fd_, F_SETFL, flags | O_NONBLOCK);
+    }
+
     struct sockaddr_un addr;
     std::memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
@@ -26,6 +32,28 @@ bool UnixSocketServer::init(const std::string& socket_path) {
     if (listen(server_fd_, 5) < 0) return false;
 
     return true;
+}
+
+void UnixSocketServer::processPendingRequests(const std::function<std::string(const std::string&)>& handler) {
+    if (server_fd_ < 0) return;
+
+    while (true) {
+        int client_fd = accept(server_fd_, NULL, NULL);
+        if (client_fd < 0) break; // No pending connections (EWOULDBLOCK / EAGAIN)
+
+        char buffer[2048];
+        std::memset(buffer, 0, sizeof(buffer));
+        ssize_t bytes = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+        if (bytes > 0) {
+            std::string command(buffer);
+            while (!command.empty() && (command.back() == '\n' || command.back() == '\r' || command.back() == ' ')) {
+                command.pop_back();
+            }
+            std::string response = handler(command);
+            send(client_fd, response.c_str(), response.size(), 0);
+        }
+        close(client_fd);
+    }
 }
 
 std::string UnixSocketClient::sendCommand(const std::string& command, const std::string& socket_path) {

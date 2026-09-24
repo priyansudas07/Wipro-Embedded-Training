@@ -2,14 +2,14 @@
 #define UNIX_SOCKET_HPP
 
 #include <string>
+#include <functional>
 
 class UnixSocketServer {
 public:
     UnixSocketServer() = default;
     ~UnixSocketServer();
     bool init(const std::string& socket_path = "/tmp/processpilot.sock");
-    std::string receiveCommand();
-    void sendResponse(int client_fd, const std::string& response);
+    void processPendingRequests(const std::function<std::string(const std::string&)>& handler);
 
 private:
     int server_fd_ = -1;
