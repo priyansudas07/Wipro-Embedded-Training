@@ -1,0 +1,15 @@
+{
+  "name": "default_sandbox",
+  "hostname": "sandboxx-default",
+  "memory_limit_mb": 128,
+  "cpu_quota_pct": 50,
+  "max_pids": 32,
+  "isolate_pid": true,
+  "isolate_net": true,
+  "isolate_mount": false,
+  "isolate_uts": true,
+  "isolate_ipc": true,
+  "drop_capabilities": true,
+  "enable_seccomp": true,
+  "command": "echo 'SandBoxX Default Environment Active'"
+}

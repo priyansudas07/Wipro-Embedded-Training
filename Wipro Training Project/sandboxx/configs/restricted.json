@@ -1,0 +1,15 @@
+{
+  "name": "restricted_sandbox",
+  "hostname": "sandboxx-isolated",
+  "memory_limit_mb": 64,
+  "cpu_quota_pct": 25,
+  "max_pids": 16,
+  "isolate_pid": true,
+  "isolate_net": true,
+  "isolate_mount": true,
+  "isolate_uts": true,
+  "isolate_ipc": true,
+  "drop_capabilities": true,
+  "enable_seccomp": true,
+  "command": "echo 'Restricted Secure Sandbox Execution'"
+}

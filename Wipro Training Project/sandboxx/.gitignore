@@ -1,0 +1,22 @@
+# Build directory
+build/
+bin/
+
+# Runtime sandbox instances and logs
+runtime/sandboxes/*
+runtime/logs/*
+!runtime/sandboxes/.gitkeep
+!runtime/logs/.gitkeep
+
+# Temporary and compiled test files
+*.o
+*.so
+*.a
+*.log
+
+# Example binaries
+examples/hello
+examples/cpu_bomb
+examples/memory_bomb
+examples/file_test
+examples/hostname_test

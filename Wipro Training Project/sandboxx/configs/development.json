@@ -1,0 +1,15 @@
+{
+  "name": "dev_sandbox",
+  "hostname": "sandboxx-dev",
+  "memory_limit_mb": 512,
+  "cpu_quota_pct": 80,
+  "max_pids": 128,
+  "isolate_pid": true,
+  "isolate_net": false,
+  "isolate_mount": false,
+  "isolate_uts": true,
+  "isolate_ipc": false,
+  "drop_capabilities": false,
+  "enable_seccomp": false,
+  "command": "echo 'Development Sandbox Environment'"
+}
