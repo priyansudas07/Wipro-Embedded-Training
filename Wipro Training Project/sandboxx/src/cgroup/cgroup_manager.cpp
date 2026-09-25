@@ -20,20 +20,28 @@ bool CgroupManager::init(const std::string& sandbox_name) {
     std::string base_v1_mem = "/sys/fs/cgroup/memory/sandboxx_" + sandbox_name;
     std::string base_v1_pids = "/sys/fs/cgroup/pids/sandboxx_" + sandbox_name;
 
-    if (fs::exists("/sys/fs/cgroup/cgroup.controllers")) {
-        // Cgroup v2
-        cpu_cgroup_path_ = base_v2;
-        memory_cgroup_path_ = base_v2;
-        pids_cgroup_path_ = base_v2;
-        fs::create_directories(base_v2);
-    } else {
-        // Cgroup v1
-        cpu_cgroup_path_ = base_v1_cpu;
-        memory_cgroup_path_ = base_v1_mem;
-        pids_cgroup_path_ = base_v1_pids;
-        fs::create_directories(base_v1_cpu);
-        fs::create_directories(base_v1_mem);
-        fs::create_directories(base_v1_pids);
+    try {
+        std::error_code ec;
+        if (fs::exists("/sys/fs/cgroup/cgroup.controllers")) {
+            // Cgroup v2
+            cpu_cgroup_path_ = base_v2;
+            memory_cgroup_path_ = base_v2;
+            pids_cgroup_path_ = base_v2;
+            fs::create_directories(base_v2, ec);
+            if (ec) {
+                Logger::getInstance().log(LogLevel::WARNING, "Non-root Cgroup notice [/sys/fs/cgroup]: " + ec.message());
+            }
+        } else {
+            // Cgroup v1
+            cpu_cgroup_path_ = base_v1_cpu;
+            memory_cgroup_path_ = base_v1_mem;
+            pids_cgroup_path_ = base_v1_pids;
+            fs::create_directories(base_v1_cpu, ec);
+            fs::create_directories(base_v1_mem, ec);
+            fs::create_directories(base_v1_pids, ec);
+        }
+    } catch (const std::exception& e) {
+        Logger::getInstance().log(LogLevel::WARNING, "Cgroup initialization exception: " + std::string(e.what()));
     }
 
     initialized_ = true;
