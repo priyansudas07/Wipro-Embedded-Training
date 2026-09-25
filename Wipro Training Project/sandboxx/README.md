@@ -100,3 +100,21 @@ ctest --output-on-failure
 ```bash
 ./sandboxx stop <sandbox_id>
 ```
+
+---
+
+## Screenshots & Execution Demo
+
+### Default Sandbox Execution
+![Default Sandbox](./docs/screenshots/sandbox_default.png)
+
+### Custom Program Execution & PID Namespace Isolation
+![Example Hello](./docs/screenshots/sandbox_hello.png)
+
+### Resource Load Monitoring (CPU & Memory)
+![CPU Load Test](./docs/screenshots/sandbox_cpu_bomb.png)
+![Memory Allocation Test](./docs/screenshots/sandbox_memory_bomb.png)
+
+### Active Sandboxes List CLI
+![Active Sandboxes List](./docs/screenshots/sandbox_list.png)
+
