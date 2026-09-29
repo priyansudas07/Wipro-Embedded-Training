@@ -1,0 +1,8 @@
+{
+  "device_name": "vdevpulse",
+  "device_path": "/tmp/vdevpulse",
+  "sampling_rate_ms": 1000,
+  "enable_cpu_telemetry": true,
+  "enable_memory_telemetry": true,
+  "max_memory_threshold_mb": 4096
+}
