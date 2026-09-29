@@ -39,7 +39,6 @@ ctest --output-on-failure
 ## Documentation
 
 - [Project Report (PDF)](docs/VDevPulse_Project_Documentation.pdf)
-- [Project Report (HTML)](docs/VDevPulse_Project_Documentation.html)
 
 Full SDLC documentation and architecture diagrams are also available across the discrete stage files:
 
