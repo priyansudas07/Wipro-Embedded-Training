@@ -38,7 +38,10 @@ ctest --output-on-failure
 
 ## Documentation
 
-Full SDLC documentation and architecture diagrams are available in the `docs/` directory:
+- 📄 **[Download Official Project Documentation (PDF)](docs/VDevPulse_Project_Documentation.pdf)**
+- 🌐 **[View HTML Documentation Report](docs/VDevPulse_Project_Documentation.html)**
+
+Full SDLC documentation and architecture diagrams are also available across the discrete stage files:
 
 - [Stage 1: Project Overview & Objectives](docs/stage1_introduction.md)
 - [Stage 2: Requirements Analysis & PRD](docs/stage2_requirements_prd.md)

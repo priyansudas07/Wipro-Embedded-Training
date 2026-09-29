@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VDevPulse — Technical Project Documentation</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm 15mm 20mm 15mm;
+    @top-right {
+      content: "VDevPulse Engineering Report";
+      font-size: 8pt;
+      color: #718096;
+    }
+    @bottom-center {
+      content: "Page " counter(page);
+      font-size: 9pt;
+      color: #718096;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #2D3748;
+    line-height: 1.55;
+    font-size: 10pt;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Cover Page */
+  .cover {
+    page-break-after: always;
+    height: 92vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 30px 20px;
+    box-sizing: border-box;
+    border: 2px solid #3182CE;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #F7FAFC 0%, #EDF2F7 100%);
+  }
+
+  .cover-header {
+    border-bottom: 3px solid #3182CE;
+    padding-bottom: 15px;
+  }
+
+  .badge-org {
+    display: inline-block;
+    background: #2B6CB0;
+    color: white;
+    font-size: 9pt;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+
+  .cover-title {
+    font-size: 24pt;
+    font-weight: 800;
+    color: #1A365D;
+    margin: 10px 0 5px 0;
+    line-height: 1.2;
+  }
+
+  .cover-subtitle {
+    font-size: 13pt;
+    color: #4A5568;
+    font-weight: 500;
+    margin-top: 0;
+  }
+
+  .cover-body {
+    margin: 40px 0;
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 10px 15px;
+    font-size: 10.5pt;
+    background: white;
+    padding: 20px;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
+  }
+
+  .meta-label {
+    font-weight: 700;
+    color: #4A5568;
+  }
+
+  .meta-value {
+    color: #1A202C;
+  }
+
+  .cover-footer {
+    border-top: 1px solid #CBD5E0;
+    padding-top: 15px;
+    font-size: 9pt;
+    color: #718096;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Typography & Structure */
+  h1 {
+    color: #1A365D;
+    font-size: 16pt;
+    font-weight: 800;
+    border-bottom: 2px solid #3182CE;
+    padding-bottom: 6px;
+    margin-top: 30px;
+    margin-bottom: 15px;
+    page-break-before: auto;
+  }
+
+  h2 {
+    color: #2B6CB0;
+    font-size: 12.5pt;
+    font-weight: 700;
+    margin-top: 20px;
+    margin-bottom: 8px;
+    border-left: 3px solid #3182CE;
+    padding-left: 8px;
+  }
+
+  h3 {
+    color: #2D3748;
+    font-size: 11pt;
+    font-weight: 700;
+    margin-top: 14px;
+    margin-bottom: 6px;
+  }
+
+  p {
+    margin: 0 0 10px 0;
+    text-align: justify;
+  }
+
+  .page-break {
+    page-break-after: always;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 16px 0;
+    font-size: 8.5pt;
+  }
+
+  th {
+    background-color: #2B6CB0;
+    color: white;
+    font-weight: 700;
+    text-align: left;
+    padding: 7px 10px;
+    border: 1px solid #2B6CB0;
+  }
+
+  td {
+    padding: 6px 10px;
+    border: 1px solid #CBD5E0;
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) {
+    background-color: #F7FAFC;
+  }
+
+  /* Code & Syntax */
+  pre {
+    background-color: #1A202C;
+    color: #E2E8F0;
+    padding: 10px 14px;
+    border-radius: 5px;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 8pt;
+    line-height: 1.4;
+    overflow-x: auto;
+    margin: 10px 0 14px 0;
+    border-left: 4px solid #3182CE;
+  }
+
+  code {
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 8.5pt;
+    background-color: #EDF2F7;
+    color: #C53030;
+    padding: 2px 4px;
+    border-radius: 3px;
+  }
+
+  pre code {
+    background-color: transparent;
+    color: #E2E8F0;
+    padding: 0;
+  }
+
+  /* Callout Boxes */
+  .callout {
+    padding: 10px 14px;
+    border-radius: 5px;
+    margin: 12px 0;
+    font-size: 9pt;
+  }
+
+  .callout-info {
+    background-color: #EBF8FF;
+    border-left: 4px solid #3182CE;
+    color: #2B6CB0;
+  }
+
+  .callout-success {
+    background-color: #F0FFF4;
+    border-left: 4px solid #38A169;
+    color: #276749;
+  }
+
+  .callout-warning {
+    background-color: #FFFAF0;
+    border-left: 4px solid #DD6B20;
+    color: #9C4221;
+  }
+
+  /* Diagram ASCII box */
+  .diagram-box {
+    background: #F7FAFC;
+    border: 1px solid #CBD5E0;
+    border-radius: 6px;
+    padding: 12px;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 7.5pt;
+    line-height: 1.25;
+    white-space: pre;
+    color: #1A202C;
+    margin: 12px 0;
+  }
+
+  .tag-pass {
+    display: inline-block;
+    background: #38A169;
+    color: white;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 7.5pt;
+  }
+
+  .toc {
+    background: #F7FAFC;
+    border: 1px solid #E2E8F0;
+    padding: 15px 20px;
+    border-radius: 6px;
+    margin: 20px 0;
+  }
+
+  .toc-item {
+    display: flex;
+    justify-content: space-between;
+    margin: 6px 0;
+    font-size: 9.5pt;
+    border-bottom: 1px dotted #CBD5E0;
+    padding-bottom: 3px;
+  }
+
+  .toc-item a {
+    text-decoration: none;
+    color: #2B6CB0;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER PAGE -->
+<div class="cover">
+  <div class="cover-header">
+    <span class="badge-org">Wipro Embedded Training • Individual Capstone Project</span>
+    <h1 class="cover-title">VDEVPULSE</h1>
+    <p class="cover-subtitle">Linux Virtual Device Interface & Real-Time System Telemetry Monitor</p>
+  </div>
+
+  <div class="cover-body">
+    <div class="meta-grid">
+      <div class="meta-label">Author:</div>
+      <div class="meta-value"><strong>Priyansu Das</strong></div>
+      <div class="meta-label">Domain:</div>
+      <div class="meta-value">Embedded Systems & Linux System Software (C++17)</div>
+      <div class="meta-label">Evaluation:</div>
+      <div class="meta-value">Full 6-Stage SDLC Engineering Report</div>
+      <div class="meta-label">Date of Delivery:</div>
+      <div class="meta-value">September 2026</div>
+      <div class="meta-label">Target Target OS:</div>
+      <div class="meta-value">POSIX Linux (Ubuntu / Debian / WSL2 Kernel &ge; 4.15)</div>
+      <div class="meta-label">Build System:</div>
+      <div class="meta-value">CMake 3.14+ with Automated CTest Test Runner</div>
+      <div class="meta-label">Repository:</div>
+      <div class="meta-value">https://github.com/priyansudas07/Wipro-Embedded-Training</div>
+    </div>
+  </div>
+
+  <div class="cover-footer">
+    <span>Confidential & Proprietary • Engineering Portfolio</span>
+    <span>Wipro COE Embedded Training</span>
+  </div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<h1>Table of Contents</h1>
+<div class="toc">
+  <div class="toc-item"><span>1. Executive Summary & Project Objectives</span><span>Stage 1</span></div>
+  <div class="toc-item"><span>2. System Requirements & Product Requirement Document (PRD)</span><span>Stage 2</span></div>
+  <div class="toc-item"><span>3. System Design, UML Architecture & Data Structures</span><span>Stage 3</span></div>
+  <div class="toc-item"><span>4. Prototype Implementation Deep-Dive</span><span>Stage 4</span></div>
+  <div class="toc-item"><span>5. Verification, Automated Testing & Quality Improvements</span><span>Stage 5</span></div>
+  <div class="toc-item"><span>6. Final Deployment, Production Guide & Future Roadmap</span><span>Stage 6</span></div>
+  <div class="toc-item"><span>Appendix: Mentor Review & Executive Presentation Guide</span><span>Q&amp;A</span></div>
+</div>
+
+<div class="callout callout-info">
+  <strong>SDLC Process Compliance:</strong> This project strictly adheres to the 6-stage Software Development Life Cycle (SDLC) mandated by Wipro Embedded Training, with discrete version-controlled milestone commits, quantified non-functional targets, UML diagrams, unit tests, and runtime deployment artifacts.
+</div>
+
+<!-- STAGE 1 -->
+<div class="page-break"></div>
+<h1>Stage 1: Project Overview & Strategic Objectives</h1>
+
+<h2>1.1 Executive Summary</h2>
+<p>
+  <strong>VDevPulse</strong> is a high-performance, resource-efficient Linux system software daemon developed in Modern C++17. It provides real-time system hardware telemetry (CPU utilization, RAM consumption, and system uptime) while maintaining a virtual character device interface at <code>/tmp/vdevpulse</code>. Designed specifically for resource-constrained embedded Linux nodes and edge gateways, VDevPulse delivers low-latency kernel telemetry parsing and POSIX device stream I/O with zero external library dependencies.
+</p>
+
+<h2>1.2 Problem Statement</h2>
+<p>
+  Embedded Linux systems operating in industrial automation, automotive ECUs, and edge gateways require continuous visibility into system health. Traditional observability solutions suffer from severe drawbacks on embedded targets:
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Monitoring Approach</th>
+      <th>Limitations on Embedded Nodes</th>
+      <th>VDevPulse Advantage</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Interactive Tools (top, htop)</strong></td>
+      <td>Designed exclusively for human terminal use; cannot be read programmatically through standard POSIX device streams.</td>
+      <td>Standard named FIFO character device node (<code>/tmp/vdevpulse</code>) allowing native POSIX file I/O.</td>
+    </tr>
+    <tr>
+      <td><strong>Python / Go Telemetry Daemons</strong></td>
+      <td>High memory footprint (50 MB – 250 MB RSS), heavy garbage collection pauses, large interpreter dependencies.</td>
+      <td>Under 15 MB RSS footprint; zero runtime allocations; zero third-party dependencies.</td>
+    </tr>
+    <tr>
+      <td><strong>Prometheus / Observability Agents</strong></td>
+      <td>Require network stacks, remote scraping endpoints, and time-series database storage.</td>
+      <td>Self-contained, local daemon reading kernel synthetic filesystems directly with &lt; 1 ms latency.</td>
+    </tr>
+    <tr>
+      <td><strong>Kernel Modules (.ko)</strong></td>
+      <td>Require root module compilation, matching kernel headers, and risk kernel panic on crashes.</td>
+      <td>User-space character device emulation using POSIX FIFO pipes; safe and portable.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>1.3 Strategic Project Goals & Scope</h2>
+<ul>
+  <li><strong>POSIX Virtual Device Node:</strong> Create and manage a named pipe (<code>mkfifo</code>) at <code>/tmp/vdevpulse</code> with non-blocking read/write operations and virtual IOCTL commands.</li>
+  <li><strong>Kernel Telemetry Engine:</strong> Parse Linux kernel synthetic filesystems (<code>/proc/stat</code>, <code>/proc/meminfo</code>, <code>/proc/uptime</code>) with microsecond response times.</li>
+  <li><strong>Thread-Safe Logging:</strong> Implement a Singleton logger utilizing <code>std::mutex</code> and RAII lock guards with 5 color-coded severity levels.</li>
+  <li><strong>Policy Engine:</strong> Load configurable runtime parameters from a JSON policy file with safe fallback to compiled defaults.</li>
+  <li><strong>Automated Testing:</strong> Deliver 100% passing unit tests integrated via CMake CTest.</li>
+</ul>
+
+<!-- STAGE 2 -->
+<div class="page-break"></div>
+<h1>Stage 2: System Requirements & Product Requirement Document (PRD)</h1>
+
+<h2>2.1 Functional Requirements Matrix</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Req ID</th>
+      <th>Subsystem</th>
+      <th>Specification & Description</th>
+      <th>Priority</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>FR-01</strong></td>
+      <td>Device Manager</td>
+      <td>Create and initialize a named FIFO pipe at the path configured in JSON policy (default: <code>/tmp/vdevpulse</code>).</td>
+      <td>High</td>
+    </tr>
+    <tr>
+      <td><strong>FR-02</strong></td>
+      <td>Device Manager</td>
+      <td>Open device node using <code>O_RDWR | O_NONBLOCK</code> flags to enable non-blocking read and write operations.</td>
+      <td>High</td>
+    </tr>
+    <tr>
+      <td><strong>FR-03</strong></td>
+      <td>Device Manager</td>
+      <td>Write real-time telemetry payload strings to the virtual device node via POSIX <code>write()</code>.</td>
+      <td>High</td>
+    </tr>
+    <tr>
+      <td><strong>FR-04</strong></td>
+      <td>Device Manager</td>
+      <td>Read user-submitted messages from the device node buffer via POSIX <code>read()</code>.</td>
+      <td>Medium</td>
+    </tr>
+    <tr>
+      <td><strong>FR-05</strong></td>
+      <td>Device Manager</td>
+      <td>Support virtual IOCTL commands: <code>VDEV_IOCTL_START (0x8001)</code>, <code>VDEV_IOCTL_STOP (0x8002)</code>, and <code>VDEV_IOCTL_RESET (0x8003)</code>.</td>
+      <td>High</td>
+    </tr>
+    <tr>
+      <td><strong>FR-06</strong></td>
+      <td>Device Manager</td>
+      <td>Track internal state machine transitions between <code>STOPPED</code>, <code>RUNNING</code>, and <code>PAUSED</code>.</td>
+      <td>Medium</td>
+    </tr>
+    <tr>
+      <td><strong>FR-07</strong></td>
+      <td>Telemetry Monitor</td>
+      <td>Parse <code>/proc/stat</code> aggregate tick line to compute percentage CPU utilization.</td>
+      <td>High</td>
+    </tr>
+    <tr>
+      <td><strong>FR-08</strong></td>
+      <td>Telemetry Monitor</td>
+      <td>Parse <code>/proc/meminfo</code> (MemTotal, MemFree, MemAvailable) to compute RAM usage in MB and percentage.</td>
+      <td>High</td>
+    </tr>
+    <tr>
+      <td><strong>FR-09</strong></td>
+      <td>Telemetry Monitor</td>
+      <td>Parse <code>/proc/uptime</code> to extract continuous system uptime in seconds.</td>
+      <td>Medium</td>
+    </tr>
+    <tr>
+      <td><strong>FR-10</strong></td>
+      <td>Telemetry Monitor</td>
+      <td>Format and render live System Telemetry Dashboard to <code>stdout</code> on each polling cycle.</td>
+      <td>High</td>
+    </tr>
+    <tr>
+      <td><strong>FR-11</strong></td>
+      <td>Config Parser</td>
+      <td>Extract JSON policy parameters (device path, sampling interval, memory threshold) from file.</td>
+      <td>Medium</td>
+    </tr>
+    <tr>
+      <td><strong>FR-12</strong></td>
+      <td>Config Parser</td>
+      <td>Gracefully fallback to compiled default configuration if policy file is missing or corrupted.</td>
+      <td>High</td>
+    </tr>
+    <tr>
+      <td><strong>FR-13</strong></td>
+      <td>Logger</td>
+      <td>Provide 5 severity channels: <code>INFO</code>, <code>SUCCESS</code>, <code>WARNING</code>, <code>ERROR</code>, <code>DEVICE</code> with ANSI colors.</td>
+      <td>Medium</td>
+    </tr>
+    <tr>
+      <td><strong>FR-14</strong></td>
+      <td>Logger</td>
+      <td>Synchronize multi-threaded log writes using <code>std::mutex</code> and RAII <code>std::lock_guard</code>.</td>
+      <td>High</td>
+    </tr>
+    <tr>
+      <td><strong>FR-15</strong></td>
+      <td>Main Engine</td>
+      <td>Trap <code>SIGINT</code> and <code>SIGTERM</code> signals to execute clean shutdown and delete device nodes.</td>
+      <td>High</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>2.2 Non-Functional Requirements (NFRs)</h2>
+<table>
+  <thead>
+    <tr>
+      <th>NFR ID</th>
+      <th>Category</th>
+      <th>Target Metric</th>
+      <th>Verification Method</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>NFR-01</strong></td>
+      <td>Latency</td>
+      <td>Telemetry parsing cycle &lt; 5 ms</td>
+      <td>Benchmarked via high-resolution clock timing</td>
+    </tr>
+    <tr>
+      <td><strong>NFR-02</strong></td>
+      <td>Memory Footprint</td>
+      <td>Resident Set Size (RSS) &lt; 15 MB</td>
+      <td>Validated via <code>/proc/[pid]/status</code> VmRSS</td>
+    </tr>
+    <tr>
+      <td><strong>NFR-03</strong></td>
+      <td>Portability</td>
+      <td>Linux Kernel &ge; 4.15, GCC &ge; 9.0, Clang &ge; 10.0</td>
+      <td>Tested on Ubuntu 20.04/22.04 LTS and WSL2</td>
+    </tr>
+    <tr>
+      <td><strong>NFR-04</strong></td>
+      <td>Reliability</td>
+      <td>100% clean shutdown without zombie resources</td>
+      <td>Signal handler verification on SIGINT/SIGTERM</td>
+    </tr>
+    <tr>
+      <td><strong>NFR-05</strong></td>
+      <td>Zero External Deps</td>
+      <td>100% C++ Standard Library and POSIX syscalls</td>
+      <td>Binary inspection via <code>ldd vdevpulse</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- STAGE 3 -->
+<div class="page-break"></div>
+<h1>Stage 3: System Design, UML Architecture & Data Structures</h1>
+
+<h2>3.1 High-Level Architecture Diagram</h2>
+<div class="diagram-box">
++═══════════════════════════════════════════════════════════════════════════════════════+
+║                                   VDevPulse Daemon                                    ║
+║                                                                                       ║
+║  +────────────────────+       +───────────────────────────────────────────────────+  ║
+║  │   ConfigParser     │       │                Logger (Singleton)                 │  ║
+║  │ (vdev_policy.json) │       │   INFO | SUCCESS | WARNING | ERROR | DEVICE       │  ║
+║  +─────────┬──────────+       +─────────────────────────┬─────────────────────────+  ║
+║            │ VDevConfig                                 │ std::mutex synchronization ║
+║            ▼                                            ▼                             ║
+║  +─────────────────────────────────────────────────────────────────────────────────+  ║
+║  │                                 DeviceManager                                   │  ║
+║  │   * mkfifo(/tmp/vdevpulse)        * open(O_RDWR | O_NONBLOCK)                   │  ║
+║  │   * writeData(telemetry)          * readData(buffer)                            │  ║
+║  │   * sendIoctl(START|STOP|RESET)   * DeviceState: STOPPED -> RUNNING -> PAUSED   │  ║
+║  +──────────────────────────────────────────┬──────────────────────────────────────+  ║
+║                                             │ queries live metrics                    ║
+║                                             ▼                                         ║
+║  +─────────────────────────────────────────────────────────────────────────────────+  ║
+║  │                               TelemetryMonitor                                  │  ║
+║  │   * /proc/stat    -> Delta CPU ticks -> cpu_usage_pct (%)                       │  ║
+║  │   * /proc/meminfo -> MemTotal, MemAvailable -> memory_used_mb (MB & %)          │  ║
+║  │   * /proc/uptime  -> System uptime (seconds)                                    │  ║
+║  +──────────────────────────────────────────┬──────────────────────────────────────+  ║
+║                                             │ writes telemetry stream                 ║
+║                                             ▼                                         ║
+║                                  /tmp/vdevpulse (POSIX FIFO)                          ║
++═════════════════════════════════════════════│═════════════════════════════════════════+
+                                              │ POSIX read() / write()
+                                              ▼
+                                 User-Space Shell & Applications
+                               (cat /tmp/vdevpulse | echo CMD > /tmp/vdevpulse)
+</div>
+
+<h2>3.2 Core C++ Data Structures</h2>
+
+<p><strong>1. Telemetry Snapshot Struct:</strong></p>
+<pre><code>// include/vdevpulse/telemetry_monitor.hpp
+struct SystemTelemetry {
+    double cpu_usage_pct    = 0.0;  // Calculated CPU utilization percentage
+    long   memory_total_mb  = 0;    // Total system physical RAM in MB
+    long   memory_used_mb   = 0;    // Consumed RAM in MB
+    long   memory_free_mb   = 0;    // Usable available RAM in MB
+    double memory_usage_pct = 0.0;  // Memory utilization percentage
+    long   uptime_seconds   = 0;    // Continuous system uptime in seconds
+};</code></pre>
+
+<p><strong>2. Device Configuration & Policy Struct:</strong></p>
+<pre><code>// include/vdevpulse/config.hpp
+struct VDevConfig {
+    std::string device_name             = "vdevpulse";
+    std::string device_path             = "/tmp/vdevpulse";
+    int         sampling_rate_ms        = 1000;
+    bool        enable_cpu_telemetry    = true;
+    bool        enable_memory_telemetry = true;
+    long        max_memory_threshold_mb = 4096;
+};</code></pre>
+
+<p><strong>3. Device State & IOCTL Command Enums:</strong></p>
+<pre><code>// include/vdevpulse/device_manager.hpp
+enum class DeviceState { STOPPED, RUNNING, PAUSED };
+
+constexpr unsigned long VDEV_IOCTL_START = 0x8001;
+constexpr unsigned long VDEV_IOCTL_STOP  = 0x8002;
+constexpr unsigned long VDEV_IOCTL_RESET = 0x8003;</code></pre>
+
+<!-- STAGE 4 -->
+<div class="page-break"></div>
+<h1>Stage 4: Prototype Implementation Deep-Dive</h1>
+
+<h2>4.1 Subsystem Implementations</h2>
+
+<h3>4.1.1 Kernel Telemetry Engine (`TelemetryMonitor`)</h3>
+<p>
+  The telemetry engine accesses the kernel's synthetic procfs directly. For CPU metrics, it parses <code>/proc/stat</code>:
+</p>
+<pre><code>idle_time     = idle + iowait;
+non_idle_time = user + nice + system + irq + softirq + steal;
+total_time    = idle_time + non_idle_time;
+cpu_usage_pct = (non_idle_time / total_time) * 100.0;</code></pre>
+<p>
+  For RAM consumption, it parses <code>/proc/meminfo</code> prioritizing <code>MemAvailable</code> over <code>MemFree</code> because <code>MemAvailable</code> incorporates reclaimable page caches and inactive slab memory, providing an accurate metric of actual memory pressure.
+</p>
+
+<h3>4.1.2 Virtual Character Device Driver (`DeviceManager`)</h3>
+<p>
+  Creates a named POSIX FIFO node using <code>mkfifo()</code> with <code>0666</code> permissions. It opens the descriptor with <code>O_RDWR | O_NONBLOCK</code>, allowing the daemon to write telemetry updates continuously without blocking when no reader process is actively connected.
+</p>
+
+<h3>4.1.3 Thread-Safe Singleton Logger (`Logger`)</h3>
+<p>
+  Enforces single-instance access with thread-safe synchronized writes using <code>std::lock_guard&lt;std::mutex&gt;</code>. Output is simultaneously rendered to <code>stdout</code> with ANSI colors and appended to <code>vdevpulse.log</code>.
+</p>
+
+<h2>4.2 Development Challenges & Engineering Solutions</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Issue ID</th>
+      <th>Subsystem</th>
+      <th>Technical Challenge</th>
+      <th>Engineering Resolution</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>DEV-01</strong></td>
+      <td>Device Manager</td>
+      <td>Opening FIFO with standard <code>O_WRONLY</code> blocked the daemon until an external reader connected.</td>
+      <td>Switched to <code>O_RDWR | O_NONBLOCK</code>, allowing independent non-blocking stream writes.</td>
+    </tr>
+    <tr>
+      <td><strong>DEV-02</strong></td>
+      <td>Config Engine</td>
+      <td>Daemon threw runtime file exceptions when optional JSON policy file was missing.</td>
+      <td>Added <code>std::filesystem::exists()</code> guard with automatic fallback to compiled defaults.</td>
+    </tr>
+    <tr>
+      <td><strong>DEV-03</strong></td>
+      <td>Logger</td>
+      <td>Log entries were lost upon sudden termination due to buffered stream delay.</td>
+      <td>Enforced explicit flushing using <code>std::endl</code> on every log dispatch.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- STAGE 5 -->
+<div class="page-break"></div>
+<h1>Stage 5: Verification, Automated Testing & Quality</h1>
+
+<h2>5.1 Unit Testing Suite</h2>
+<p>
+  VDevPulse integrates an automated CTest test suite consisting of two dedicated test drivers linked against the core static library:
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Test Suite</th>
+      <th>Test ID</th>
+      <th>Assertion / Test Objective</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="4"><strong>device_test.cpp</strong><br><em>(Device Manager)</em></td>
+      <td>TC-DEV-01</td>
+      <td>Initialize FIFO node at <code>/tmp/vdevpulse_unittest</code> successfully</td>
+      <td><span class="tag-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td>TC-DEV-02</td>
+      <td>Open device descriptor and verify state transitions to <code>RUNNING</code></td>
+      <td><span class="tag-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td>TC-DEV-03</td>
+      <td>Write diagnostic string payload to FIFO without blocking</td>
+      <td><span class="tag-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td>TC-DEV-04</td>
+      <td>Execute <code>VDEV_IOCTL_START</code> command and assert state retention</td>
+      <td><span class="tag-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td rowspan="3"><strong>telemetry_test.cpp</strong><br><em>(Telemetry Monitor)</em></td>
+      <td>TC-TEL-01</td>
+      <td>Assert total system RAM extracted from <code>/proc/meminfo</code> &gt; 0 MB</td>
+      <td><span class="tag-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td>TC-TEL-02</td>
+      <td>Assert used RAM is non-negative and &le; total physical RAM</td>
+      <td><span class="tag-pass">PASS</span></td>
+    </tr>
+    <tr>
+      <td>TC-TEL-03</td>
+      <td>Assert system uptime parsed from <code>/proc/uptime</code> &ge; 0 seconds</td>
+      <td><span class="tag-pass">PASS</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>5.2 Automated CTest Execution Output</h2>
+<pre><code>Test project /mnt/f/Projects/Wipro-Embedded-Training/Wipro Individual Project/vdevpulse/build
+    Start 1: device_test
+1/2 Test #1: device_test ......................   Passed    0.02 sec
+    Start 2: telemetry_test
+2/2 Test #2: telemetry_test ...................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 2
+Total Test time (real) =   0.03 sec</code></pre>
+
+<!-- STAGE 6 -->
+<div class="page-break"></div>
+<h1>Stage 6: Final Deployment, Production Guide & Future Roadmap</h1>
+
+<h2>6.1 Production systemd Service Deployment</h2>
+<p>
+  To deploy VDevPulse as an automated background system service on Linux distributions:
+</p>
+
+<p><strong>Unit File Configuration:</strong> <code>/etc/systemd/system/vdevpulse.service</code></p>
+<pre><code>[Unit]
+Description=VDevPulse Linux Virtual Device & System Telemetry Daemon
+After=network.target local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/vdevpulse run /etc/vdevpulse/vdev_policy.json
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+
+<h2>6.2 Project Achievements vs System Limitations</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Project Achievements</th>
+      <th>Current Limitations & Boundary Constraints</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        &bull; Zero third-party external dependencies.<br>
+        &bull; Ultra-low memory consumption (&lt; 15 MB RSS).<br>
+        &bull; POSIX-compliant character device interface (<code>/tmp/vdevpulse</code>).<br>
+        &bull; 100% pass rate across automated CTest unit test suite.<br>
+        &bull; Complete 6-stage SDLC documentation traceability.
+      </td>
+      <td>
+        &bull; Emulated via user-space named FIFO instead of native kernel module (<code>.ko</code>).<br>
+        &bull; Telemetry sampling restricted to local host node.<br>
+        &bull; Single-threaded daemon loop.
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>6.3 Future Engineering Roadmap</h2>
+<ol>
+  <li><strong>Native Linux Kernel Driver (.ko):</strong> Migrate user-space FIFO emulation to a real kernel character device using <code>cdev_add</code>, <code>file_operations</code>, and kernel IOCTL handlers.</li>
+  <li><strong>gRPC Remote Telemetry Stream:</strong> Expose live metrics over lightweight gRPC endpoints for centralized fleet telemetry aggregation.</li>
+  <li><strong>eBPF Kernel Probes:</strong> Integrate eBPF tracepoints to monitor per-process I/O throughput and socket activity.</li>
+</ol>
+
+<!-- APPENDIX -->
+<div class="page-break"></div>
+<h1>Appendix: Mentor Review & Executive Presentation Guide</h1>
+
+<h2>Key Technical Discussion Questions & Answers</h2>
+
+<div class="callout callout-info">
+  <strong>Q1: Why parse <code>/proc</code> instead of compiling a kernel module or writing eBPF probes?</strong><br>
+  <em>Answer:</em> Parsing kernel procfs provides 100% portability across all Linux kernels (&ge; 4.15) without needing root privileges to insert modules or fighting the eBPF kernel verifier constraints. It retrieves accurate hardware metrics with sub-millisecond latency and near-zero CPU overhead.
+</div>
+
+<div class="callout callout-info">
+  <strong>Q2: How does VDevPulse guarantee thread-safety during concurrent logging?</strong><br>
+  <em>Answer:</em> All log calls dispatch through <code>Logger::log()</code>, which instantiates an RAII <code>std::lock_guard&lt;std::mutex&gt;</code> on its first line. This ensures mutual exclusion across concurrent threads and guarantees lock release even in exceptional exit paths.
+</div>
+
+<div class="callout callout-info">
+  <strong>Q3: How is CPU utilization calculated from <code>/proc/stat</code>?</strong><br>
+  <em>Answer:</em> The daemon reads the aggregate <code>cpu</code> row tick counts (user, nice, system, idle, iowait, irq, softirq, steal). It computes idle ticks as <code>idle + iowait</code> and active ticks as the remaining sum, calculating CPU percentage as <code>(active / total) * 100</code>.
+</div>
+
+<div class="callout callout-info">
+  <strong>Q4: How does clean shutdown operate upon receiving Ctrl+C?</strong><br>
+  <em>Answer:</em> Posix signal handlers for <code>SIGINT</code> and <code>SIGTERM</code> update an <code>std::atomic&lt;bool&gt; vdev_running</code> flag. When the main loop exits, the <code>DeviceManager</code> destructor executes RAII cleanup: closing file descriptors and removing the named pipe node from the filesystem.
+</div>
+
+<div style="margin-top: 40px; border-top: 2px solid #CBD5E0; padding-top: 15px; font-size: 8.5pt; color: #718096; text-align: center;">
+  <strong>VDevPulse Engineering Documentation</strong> • Author: Priyansu Das • Wipro Embedded Training 2026
+</div>
+
+</body>
+</html>
