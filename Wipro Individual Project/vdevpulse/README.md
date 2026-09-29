@@ -33,13 +33,13 @@ make -j$(nproc)
 ctest --output-on-failure
 
 # Launch VDevPulse daemon
-./vdevpulse_daemon ../configs/vdev_policy.json
+./vdevpulse run ../configs/vdev_policy.json
 ```
 
 ## Documentation
 
-- 📄 **[Download Official Project Documentation (PDF)](docs/VDevPulse_Project_Documentation.pdf)**
-- 🌐 **[View HTML Documentation Report](docs/VDevPulse_Project_Documentation.html)**
+- [Project Report (PDF)](docs/VDevPulse_Project_Documentation.pdf)
+- [Project Report (HTML)](docs/VDevPulse_Project_Documentation.html)
 
 Full SDLC documentation and architecture diagrams are also available across the discrete stage files:
 
