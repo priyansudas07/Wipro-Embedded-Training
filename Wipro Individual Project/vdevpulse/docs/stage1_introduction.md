@@ -1,52 +1,85 @@
-# Stage 1: Project Overview & Strategic Objectives
+# Stage 1: Project Introduction
 
-## 1. Documentation & Requirements Scope
+## 1.1 Project Idea & Objective
 
-### Executive Summary
-VDevPulse is an embedded system software daemon implemented in modern C++17 designed to provide high-throughput system resource monitoring paired with a Linux character device interface `/dev/vdevpulse`. Embedded systems and edge computing environments require real-time visibility into CPU utilization, memory pressure, and system health while maintaining minimal runtime overhead and operating without heavy third-party runtime frameworks.
+**Project Name**: VDevPulse — Virtual Device Interface & System Telemetry Monitor
 
-VDevPulse fulfills this requirement by directly interacting with Linux kernel abstractions (`/proc` filesystem) and POSIX file streams, enabling low-latency telemetry collection and user-space hardware control.
-
-### Problem Statement
-Modern Linux-based edge nodes and autonomous system gateways frequently face resource contention, unexpected memory depletion, and silent CPU throttles. Traditional telemetry tools (such as `top`, `htop`, or heavy Python/Go daemons) introduce significant runtime bloat, high CPU allocation overhead, and external library dependencies unsuitable for resource-constrained embedded targets.
-
-Furthermore, applications in industrial automation need a standard POSIX device interface (`/dev/*`) to query telemetry data and submit device control IOCTLs using native file operations (`open`, `read`, `write`, `close`).
-
-### Project Goals & Vision
-1. **POSIX Device Interface Emulation**: Present a virtual character device node `/dev/vdevpulse` capable of handling concurrent read/write streams.
-2. **Kernel Telemetry Parser**: Extract low-level CPU tick distributions from `/proc/stat` and system memory allocation metrics from `/proc/meminfo` with zero dynamic heap churn.
-3. **Thread-Safe Concurrent Logging**: Provide thread-safe asynchronous logging capabilities across multiple severity channels (DEBUG, INFO, WARN, ERROR).
-4. **Policy-Driven Operations**: Allow dynamic runtime configuration loading via JSON specification files without needing binary re-compilation.
-5. **Zero External Dependency Footprint**: Built purely using modern C++17 standard libraries and native Linux syscalls.
+**Objective**: Design and implement a lightweight Linux system software daemon in Modern C++17 that:
+1. Creates and manages a **virtual Linux character device node** (`/tmp/vdevpulse`) using POSIX FIFO pipes, emulating the standard Linux `/dev/*` device interface.
+2. Continuously **monitors real-time system telemetry** (CPU utilization, RAM usage, system uptime) by parsing Linux kernel's synthetic filesystem interfaces (`/proc/stat`, `/proc/meminfo`, `/proc/uptime`).
+3. Provides a **POSIX-standard device I/O interface** supporting `read()`, `write()`, and virtual `ioctl()` command operations.
+4. Implements a **thread-safe logging subsystem** for runtime diagnostics.
+5. Loads **dynamic runtime policies** from a JSON configuration file without requiring binary recompilation.
 
 ---
 
-## 2. Version Control & Git Commit Tracking
+## 1.2 Problem Statement
 
-- **SDLC Phase**: Stage 1 - Concept & Feasibility
-- **Commit Target**: `[Stage 1] Initial project proposal, scope & introduction documentation`
+Modern embedded Linux systems — including industrial automation controllers, edge computing nodes, and autonomous gateway devices — have an increasing need for **real-time hardware resource telemetry** and **device control interfaces** operating under strict resource constraints.
+
+Existing tools present significant practical drawbacks:
+
+| Existing Tool | Problem |
+| :--- | :--- |
+| `top`, `htop` | Interactive only, not automatable, no device I/O interface |
+| Python/Go telemetry daemons | High memory overhead (50–300 MB RSS), large dependency graphs |
+| Heavy observability stacks (Prometheus, Grafana) | Require additional processes, network stacks, time-series databases |
+| Direct kernel modules | Require elevated root privileges and kernel build infrastructure |
+
+There is no lightweight, self-contained, C++ native solution that combines:
+- A POSIX character device interface (`/dev/*` paradigm)
+- Real-time kernel telemetry collection via `/proc`
+- Thread-safe structured logging with configurable policy
+
+VDevPulse directly addresses this gap.
+
+---
+
+## 1.3 Project Scope
+
+### In Scope
+- Virtual POSIX character device creation and lifecycle management using named FIFO pipes (`mkfifo`)
+- Real-time parsing of three kernel `/proc` interfaces:
+  - `/proc/stat` — CPU tick accounting
+  - `/proc/meminfo` — RAM allocation and availability
+  - `/proc/uptime` — System uptime duration
+- Virtual IOCTL command interface (`VDEV_IOCTL_START`, `VDEV_IOCTL_STOP`, `VDEV_IOCTL_RESET`)
+- Color-coded terminal telemetry dashboard output
+- JSON policy configuration loading
+- Thread-safe structured logging with severity levels: `INFO`, `SUCCESS`, `WARNING`, `ERROR`, `DEVICE`
+- Automated CMake CTest unit testing suite
+- Full 6-stage SDLC documentation
+
+### Out of Scope
+- Native Linux Kernel Module (`.ko` file) insertion requiring `insmod`
+- eBPF tracepoint or kprobe kernel hooks
+- Networked telemetry export (gRPC, REST API)
+- Multi-node distributed monitoring
+
+---
+
+## 1.4 Expected Outcome & Application
+
+**Expected Outcome**: A fully functional, single-binary daemon `vdevpulse` that runs on any C++17-compatible Linux system without external library installation, providing real-time system telemetry through both terminal output and a virtual device node interface.
+
+**Application Domains**:
+- Embedded Linux edge nodes (Raspberry Pi, NXP i.MX series, BeagleBone)
+- Industrial automation system monitoring
+- Automotive embedded ECU resource management
+- Telecom gateway health monitoring
+
+---
+
+## 1.5 Version Control & Progress Evidence
+
+- **SDLC Phase**: Stage 1 — Project Introduction
+- **Git Commit**: `[Stage 1] Initial project proposal, scope & introduction documentation`
 - **Branch**: `main`
-- **Repository Path**: `Wipro Individual Project/vdevpulse/`
 
 ---
 
-## 3. Progress Evidence
+## 1.6 Roadmap for Next Stage (Stage 2)
 
-- Project repository initialized with standard C++ embedded project hierarchy (`include/`, `src/`, `configs/`, `tests/`, `docs/`).
-- Problem statement and high-level feasibility validated against Linux kernel `/proc` filesystem capabilities.
-- Target deliverables established: C++17 core daemon binary, CMake build system, CTest suite, and 6-stage SDLC documentation.
-
----
-
-## 4. Demonstration & Presentation Notes
-
-- **Key Takeaway for Mentors**: Explain why C++17 and kernel `/proc` abstractions were selected over heavy external frameworks to minimize RAM and CPU footprint in embedded environments.
-- **Demo Focus**: Walk mentors through the repository layout and explain the core goals of `/dev/vdevpulse` virtual character device I/O.
-
----
-
-## 5. Roadmap for Next Stage (Stage 2)
-
-- Define quantitative functional requirements (FR-01 to FR-07) and non-functional requirements (NFRs).
-- Specify hardware/software operational boundaries and telemetry parsing thresholds.
-- Create Product Requirement Document (PRD) specification matrix.
+- Formally document all functional requirements (FR matrix)
+- Define non-functional requirements with quantified performance targets
+- Design project development timeline with phased milestones

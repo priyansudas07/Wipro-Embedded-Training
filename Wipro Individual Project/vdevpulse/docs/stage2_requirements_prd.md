@@ -1,60 +1,85 @@
-# Stage 2: System Requirements & Product Requirement Document (PRD)
+# Stage 2: Project Requirements & Development Plan
 
-## 1. Functional & Non-Functional Requirements Documentation
+## 2.1 Functional Requirements
 
-### Functional Requirements Matrix
+Functional requirements define the specific behaviours and capabilities the system must provide.
 
 | Req ID | Module | Description | Priority |
 | :--- | :--- | :--- | :--- |
-| **FR-01** | Device Manager | Must create and maintain a named FIFO/character pipe node at `/tmp/vdevpulse` or `/dev/vdevpulse`. | High |
-| **FR-02** | Device Manager | Must accept user-space read operations and return current system telemetry formatted as key-value metrics. | High |
-| **FR-03** | Device Manager | Must accept user-space write operations to parse operational commands (`RESET_TELEMETRY`, `SET_SAMPLE_RATE`). | Medium |
-| **FR-04** | Telemetry Monitor | Must read `/proc/stat` and compute aggregate CPU usage percentage based on user, system, idle, and iowait ticks. | High |
-| **FR-05** | Telemetry Monitor | Must read `/proc/meminfo` and extract `MemTotal`, `MemFree`, `MemAvailable`, computing RAM usage percentage. | High |
-| **FR-06** | Policy Config Engine | Must load configuration options (log file path, polling interval in milliseconds, alert thresholds) from JSON. | Medium |
-| **FR-07** | Logger | Must write timestamped log entries to stdout and log file with thread safety (`std::mutex`). | High |
-
-### Non-Functional Requirements (NFRs)
-- **Performance**: Telemetry parsing cycle must complete within < 5ms per sampling interval.
-- **Memory Footprint**: Resident Set Size (RSS) memory consumption must stay under 15 MB.
-- **Portability**: Must build and run on any C++17 POSIX-compliant Linux OS (Kernel >= 4.15).
-- **Reliability**: Graceful handling of missing files, invalid device paths, and bad JSON input without throwing unhandled exceptions.
-- **Maintainability**: Modular OOP structure adhering to C++ Core Guidelines and SOLID principles.
-
-### Hardware & Software Requirements
-- **Operating System**: Linux (Ubuntu, Debian, RedHat, or WSL2)
-- **Compiler**: GCC 9.0+ or Clang 10.0+ supporting `-std=c++17`
-- **Build System**: CMake 3.14+
-- **Version Control**: Git 2.25+
+| **FR-01** | `DeviceManager` | The system shall create a POSIX named FIFO node at the path specified in `vdev_policy.json` (default: `/tmp/vdevpulse`) using `mkfifo(3)`. | High |
+| **FR-02** | `DeviceManager` | The system shall open the virtual device node with `O_RDWR | O_NONBLOCK` flags to support non-blocking read and write operations. | High |
+| **FR-03** | `DeviceManager` | The system shall support `writeData()` — writing telemetry payload strings to the virtual device node via POSIX `write(2)`. | High |
+| **FR-04** | `DeviceManager` | The system shall support `readData()` — reading up to 1023 bytes from the virtual device node via POSIX `read(2)`. | Medium |
+| **FR-05** | `DeviceManager` | The system shall support three virtual IOCTL commands: `VDEV_IOCTL_START (0x8001)`, `VDEV_IOCTL_STOP (0x8002)`, `VDEV_IOCTL_RESET (0x8003)`. | High |
+| **FR-06** | `DeviceManager` | The system shall track a `DeviceState` enum (`STOPPED`, `RUNNING`, `PAUSED`) updated upon each IOCTL command. | Medium |
+| **FR-07** | `TelemetryMonitor` | The system shall parse `/proc/stat` to compute CPU utilization as a percentage of non-idle CPU ticks over total CPU ticks. | High |
+| **FR-08** | `TelemetryMonitor` | The system shall parse `/proc/meminfo` for `MemTotal`, `MemFree`, `MemAvailable` to compute RAM usage in MB and percentage. | High |
+| **FR-09** | `TelemetryMonitor` | The system shall parse `/proc/uptime` to report system uptime in seconds. | Medium |
+| **FR-10** | `TelemetryMonitor` | The system shall render a formatted real-time **System Telemetry Dashboard** to `stdout` on each sampling cycle. | High |
+| **FR-11** | `ConfigParser` | The system shall load `device_name`, `device_path`, `sampling_rate_ms`, `enable_cpu_telemetry`, `enable_memory_telemetry`, and `max_memory_threshold_mb` from a JSON policy file. | Medium |
+| **FR-12** | `ConfigParser` | If the policy file is missing, the system shall fall back to compiled-in default values without crashing. | High |
+| **FR-13** | `Logger` | The system shall provide five log severity levels: `INFO`, `SUCCESS`, `WARNING`, `ERROR`, `DEVICE`, each rendered in a distinct ANSI terminal color. | Medium |
+| **FR-14** | `Logger` | All log writes shall be protected by `std::mutex` via RAII `std::lock_guard` for thread-safe concurrent use. | High |
+| **FR-15** | `Logger` | Log output shall be simultaneously written to `stdout` and an optional log file (`vdevpulse.log`). | Medium |
 
 ---
 
-## 2. Version Control & Git Commit Tracking
+## 2.2 Non-Functional Requirements (NFRs)
 
-- **SDLC Phase**: Stage 2 - Requirements & PRD
-- **Commit Target**: `[Stage 2] Formalized Product Requirement Document (PRD) & specification matrix`
+| NFR ID | Category | Description | Target |
+| :--- | :--- | :--- | :--- |
+| **NFR-01** | Performance | Single telemetry sampling cycle latency | < 5 ms |
+| **NFR-02** | Memory Footprint | RSS memory consumption of the daemon process | < 15 MB |
+| **NFR-03** | Portability | Must compile and execute on Linux kernel | >= 4.15 |
+| **NFR-04** | Reliability | No unhandled exceptions; all error paths return gracefully | 100% |
+| **NFR-05** | Maintainability | Each class restricted to a single responsibility (SOLID) | Mandatory |
+| **NFR-06** | Dependency-Free | Zero external library dependencies beyond libc and libstdc++ | Mandatory |
+| **NFR-07** | Testability | All core modules must have an associated automated unit test case | 100% |
+| **NFR-08** | Signal Safety | Daemon must shut down cleanly on `SIGINT` or `SIGTERM` without resource leaks | Mandatory |
+
+---
+
+## 2.3 System Modules & Deliverables
+
+| Module | Source Files | Responsibility |
+| :--- | :--- | :--- |
+| `Logger` | `logger.hpp`, `logger.cpp` | Singleton thread-safe logging with ANSI color support |
+| `ConfigParser` + `VDevConfig` | `config.hpp`, `config.cpp` | JSON policy file parsing and default configuration |
+| `TelemetryMonitor` + `SystemTelemetry` | `telemetry_monitor.hpp`, `telemetry_monitor.cpp` | `/proc` kernel filesystem telemetry collection |
+| `DeviceManager` | `device_manager.hpp`, `device_manager.cpp` | POSIX virtual character device lifecycle and I/O |
+| Main Daemon | `main.cpp` | CLI argument dispatch, signal handling, daemon loop |
+| Unit Tests | `device_test.cpp`, `telemetry_test.cpp` | CTest-integrated automated verification |
+| Policy Config | `configs/vdev_policy.json` | Runtime device and telemetry configuration |
+| Build System | `CMakeLists.txt` | CMake 3.14+ build and CTest target configuration |
+| Documentation | `docs/*.md` | Full 6-stage SDLC engineering documentation |
+
+---
+
+## 2.4 Development Plan & Milestone Timeline
+
+| Milestone | Duration | Deliverables | Status |
+| :--- | :--- | :--- | :--- |
+| **M1** — Requirements & Design | Week 1 | PRD document, NFR table, module list, development plan | Complete |
+| **M2** — Architecture & Interfaces | Week 1-2 | System architecture, UML diagrams, all `.hpp` header files | Complete |
+| **M3** — Core Implementation | Week 2-3 | All `.cpp` source files, `CMakeLists.txt`, `vdev_policy.json` | Complete |
+| **M4** — Testing & Verification | Week 3-4 | `device_test.cpp`, `telemetry_test.cpp`, CTest 100% pass | Complete |
+| **M5** — Documentation & Delivery | Week 4 | All 6-stage SDLC docs, presentation guide, GitHub push | Complete |
+
+---
+
+## 2.5 Version Control & Progress Evidence
+
+- **SDLC Phase**: Stage 2 — Requirements & Development Plan
+- **Git Commit**: `[Stage 2] Formalized Product Requirement Document (PRD) & specification matrix`
 - **Branch**: `main`
-- **Repository Path**: `Wipro Individual Project/vdevpulse/`
+- **Progress**: Functional requirements FR-01 to FR-15, NFRs NFR-01 to NFR-08, and all 9 module deliverables formally documented.
 
 ---
 
-## 3. Progress Evidence
+## 2.6 Roadmap for Next Stage (Stage 3)
 
-- Functional requirements FR-01 through FR-07 validated against stakeholder expectations.
-- Operational boundaries established for system resources (RSS < 15MB, latency < 5ms).
-- JSON configuration schema designed for `configs/vdev_policy.json`.
-
----
-
-## 4. Demonstration & Presentation Notes
-
-- **Key Takeaway for Mentors**: Present the PRD requirements matrix highlighting how low latency (< 5ms) and small footprint (< 15MB) drive design choices.
-- **Demo Focus**: Show how each requirement maps directly to software modules (`DeviceManager`, `TelemetryMonitor`, `Config`, `Logger`).
-
----
-
-## 5. Roadmap for Next Stage (Stage 3)
-
-- Design system architecture and component interactions.
-- Produce UML Class, Sequence, and State Machine diagrams using Mermaid markdown syntax.
-- Define C++ class interfaces (`.hpp` headers) for core modules.
+- Design full system architecture with ASCII component diagram
+- Define all C++ data structures: `SystemTelemetry`, `VDevConfig`, `DeviceState`
+- Create UML Class Diagram, Sequence Diagram, and State Machine Diagram
+- Set up development toolchain (GCC 15, CMake 3.28, WSL2 Ubuntu)
+- Configure Git branching strategy and commit naming convention
