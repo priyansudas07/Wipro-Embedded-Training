@@ -1,0 +1,13 @@
+# Build directory
+build/
+bin/
+
+# Compiled objects, static libs and temporary logs
+*.o
+*.so
+*.a
+*.log
+*.fifo
+
+# Keep git structure
+!docs/screenshots/.gitkeep
