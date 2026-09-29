@@ -120,47 +120,47 @@ classDiagram
     class Logger {
         -ofstream log_file_
         -mutex mutex_
-        +getInstance() Logger&
-        +init(log_path: string) void
-        +log(level: LogLevel, message: string) void
+        +getInstance() Logger
+        +init(log_path string) void
+        +log(level LogLevel, message string) void
     }
 
     class VDevConfig {
-        +device_name: string = "vdevpulse"
-        +device_path: string = "/tmp/vdevpulse"
-        +sampling_rate_ms: int = 1000
-        +enable_cpu_telemetry: bool = true
-        +enable_memory_telemetry: bool = true
-        +max_memory_threshold_mb: long = 4096
+        +string device_name
+        +string device_path
+        +int sampling_rate_ms
+        +bool enable_cpu_telemetry
+        +bool enable_memory_telemetry
+        +long max_memory_threshold_mb
     }
 
     class ConfigParser {
-        +loadPolicy(filepath: string, config: VDevConfig) bool
+        +loadPolicy(filepath string, config VDevConfig) bool
     }
 
     class SystemTelemetry {
-        +cpu_usage_pct: double
-        +memory_total_mb: long
-        +memory_used_mb: long
-        +memory_free_mb: long
-        +memory_usage_pct: double
-        +uptime_seconds: long
+        +double cpu_usage_pct
+        +long memory_total_mb
+        +long memory_used_mb
+        +long memory_free_mb
+        +double memory_usage_pct
+        +long uptime_seconds
     }
 
     class TelemetryMonitor {
         +collectTelemetry() SystemTelemetry
-        +printTelemetryDashboard(metrics: SystemTelemetry) void
+        +printTelemetryDashboard(metrics SystemTelemetry) void
     }
 
     class DeviceManager {
-        -device_path_: string
-        -device_fd_: int
-        -state_: DeviceState
-        +initDevice(config: VDevConfig) bool
+        -string device_path_
+        -int device_fd_
+        -DeviceState state_
+        +initDevice(config VDevConfig) bool
         +openDevice() bool
-        +writeData(buffer: string) bool
+        +writeData(buffer string) bool
         +readData() string
-        +sendIoctl(cmd: ulong) bool
+        +sendIoctl(cmd ulong) bool
         +closeDevice() void
         +getState() DeviceState
         +getDevicePath() string
@@ -183,7 +183,7 @@ sequenceDiagram
     participant CFG as ConfigParser
     participant DEV as DeviceManager
     participant TEL as TelemetryMonitor
-    participant PROC as /proc FS
+    participant PROC as procfs
     participant LOG as Logger
 
     Main->>CFG: loadPolicy("vdev_policy.json", config)
@@ -196,29 +196,29 @@ sequenceDiagram
     DEV-->>Main: true
 
     Main->>DEV: openDevice()
-    DEV->>DEV: open(O_RDWR|O_NONBLOCK)
-    DEV->>LOG: log(INFO, "Opened fd=N")
+    DEV->>DEV: open non-blocking
+    DEV->>LOG: log(INFO, "Opened device descriptor")
 
     loop Every 1000ms while vdev_running
         Main->>TEL: collectTelemetry()
         TEL->>PROC: read /proc/stat
-        PROC-->>TEL: cpu ticks (user/system/idle)
+        PROC-->>TEL: cpu tick counters
         TEL->>PROC: read /proc/meminfo
-        PROC-->>TEL: MemTotal / MemAvailable (kB)
+        PROC-->>TEL: memory counters
         TEL->>PROC: read /proc/uptime
         PROC-->>TEL: uptime seconds
         TEL-->>Main: SystemTelemetry struct
 
         Main->>TEL: printTelemetryDashboard(metrics)
         Main->>DEV: writeData("TELEMETRY_SAMPLE CPU=X MEM=YMB")
-        DEV->>DEV: write(fd, payload)
-        DEV->>LOG: log(DEVICE, "Wrote N bytes")
+        DEV->>DEV: write to FIFO
+        DEV->>LOG: log(DEVICE, "Wrote payload bytes")
     end
 
-    Note over Main: SIGINT received
+    Note over Main: Signal SIGINT received
     Main->>LOG: log(INFO, "Shutting down cleanly")
-    Main->>DEV: ~DeviceManager() → closeDevice()
-    DEV->>DEV: close(fd), remove("/tmp/vdevpulse")
+    Main->>DEV: closeDevice() via Destructor
+    DEV->>DEV: close descriptor and remove FIFO
 ```
 
 ### 3.4.3 State Machine Diagram — Virtual Device Lifecycle
@@ -227,19 +227,19 @@ sequenceDiagram
 stateDiagram-v2
     [*] --> Uninitialized
 
-    Uninitialized --> Initializing : initDevice(config)
-    Initializing --> NodeCreated : mkfifo() succeeds
-    Initializing --> Uninitialized : mkfifo() fails (errno logged)
+    Uninitialized --> Initializing : initDevice
+    Initializing --> NodeCreated : mkfifo success
+    Initializing --> Uninitialized : mkfifo error
 
-    NodeCreated --> Running : openDevice() O_RDWR|O_NONBLOCK
-    Running --> Running : writeData() / readData()
-    Running --> Running : sendIoctl(VDEV_IOCTL_START)
-    Running --> Stopped : sendIoctl(VDEV_IOCTL_STOP)
-    Stopped --> Running : sendIoctl(VDEV_IOCTL_RESET)
+    NodeCreated --> Running : openDevice nonblocking
+    Running --> Running : writeData or readData
+    Running --> Running : IOCTL START
+    Running --> Stopped : IOCTL STOP
+    Stopped --> Running : IOCTL RESET
 
-    Running --> Cleanup : SIGINT / SIGTERM received
-    Stopped --> Cleanup : SIGINT / SIGTERM received
-    Cleanup --> [*] : close(fd), fs::remove(node)
+    Running --> Cleanup : SIGINT or SIGTERM
+    Stopped --> Cleanup : SIGINT or SIGTERM
+    Cleanup --> [*] : close and remove FIFO
 ```
 
 ---
