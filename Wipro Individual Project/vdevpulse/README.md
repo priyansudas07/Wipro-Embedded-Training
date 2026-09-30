@@ -31,10 +31,52 @@ make -j$(nproc)
 
 # Execute test suite
 ctest --output-on-failure
+```
 
-# Launch VDevPulse daemon
+## CLI Usage Guide
+
+### 1. Launch Continuous Daemon Loop
+Starts the live telemetry monitor and creates the virtual character device at `/tmp/vdevpulse`:
+```bash
 ./vdevpulse run ../configs/vdev_policy.json
 ```
+*(Press `Ctrl + C` for graceful shutdown)*
+
+### 2. Read Telemetry Stream (Client Terminal)
+While the daemon is running, open a separate terminal to read live telemetry directly from the virtual device node:
+```bash
+cat /tmp/vdevpulse
+# Output: TELEMETRY_SAMPLE CPU=14.370000 MEM=7142MB
+```
+
+### 3. Query Single Telemetry Snapshot
+```bash
+./vdevpulse status
+```
+
+### 4. Send Virtual IOCTL Control Commands
+```bash
+./vdevpulse ioctl start    # Set virtual device state to RUNNING
+./vdevpulse ioctl stop     # Set virtual device state to STOPPED
+./vdevpulse ioctl reset    # Reset virtual device state
+```
+
+### 5. Write Payload to Virtual Device
+```bash
+./vdevpulse write "PING_DIAGNOSTIC_SIGNAL"
+```
+
+### CLI Command Summary
+
+| Command | Description |
+| :--- | :--- |
+| `./vdevpulse` | Displays usage and help menu |
+| `./vdevpulse run [policy.json]` | Starts the continuous live daemon loop |
+| `./vdevpulse status` | Displays an instantaneous CPU, RAM, and Uptime snapshot |
+| `./vdevpulse ioctl <start\|stop\|reset>` | Sends an IOCTL state management command |
+| `./vdevpulse write <message>` | Writes a custom payload string to the virtual device node |
+| `cat /tmp/vdevpulse` | Reads real-time telemetry stream from the device node |
+
 
 ## Documentation
 
