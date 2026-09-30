@@ -5,39 +5,42 @@
 VDevPulse is structured as a modular, single-process daemon with four loosely-coupled subsystems communicating through well-defined C++ interfaces.
 
 ```
-╔═══════════════════════════════════════════════════════════════════╗
-║                   vdevpulse — System Daemon                       ║
-║                                                                   ║
-║  ┌─────────────────┐        ┌───────────────────────────────┐    ║
-║  │  ConfigParser   │        │       Logger (Singleton)       │    ║
-║  │  vdev_policy.   │        │  INFO | SUCCESS | WARNING      │    ║
-║  │      json       │        │  ERROR | DEVICE                │    ║
-║  └────────┬────────┘        └──────────────┬────────────────┘    ║
-║           │ VDevConfig                      │ std::mutex RAII     ║
-║           ▼                                 ▼                     ║
-║  ┌────────────────────────────────────────────────────────────┐   ║
-║  │                      DeviceManager                         │   ║
-║  │   mkfifo() → open(O_RDWR|O_NONBLOCK) → write() → read()  │   ║
-║  │   IOCTL: VDEV_START(0x8001) | STOP(0x8002) | RESET(0x8003)│   ║
-║  │   State: STOPPED ─→ RUNNING ─→ PAUSED                     │   ║
-║  └──────────────────────────┬─────────────────────────────────┘   ║
-║                             │ reads /proc                         ║
-║                             ▼                                     ║
-║  ┌────────────────────────────────────────────────────────────┐   ║
-║  │                    TelemetryMonitor                        │   ║
-║  │   /proc/stat     → CPU tick delta → cpu_usage_pct         │   ║
-║  │   /proc/meminfo  → MemTotal/MemAvail → memory_used_mb     │   ║
-║  │   /proc/uptime   → uptime_seconds                         │   ║
-║  └────────────────────────────────────────────────────────────┘   ║
-║                             │ writes to                           ║
-║                             ▼                                     ║
-║                  /tmp/vdevpulse  (POSIX FIFO)                     ║
-║                             │                                     ║
-╚═════════════════════════════│═════════════════════════════════════╝
-                              │ POSIX read() / write()
-                              ▼
-                 User-space Applications / Shell
-                 (cat /tmp/vdevpulse, echo CMD > /tmp/vdevpulse)
+╔═══════════════════════════════════════════════════════════════════════════════════╗
+║                        vdevpulse — System Daemon                                  ║
+║                                                                                   ║
+║  ┌──────────────────┐    ┌───────────────────────────┐    ┌────────────────────┐  ║
+║  │   ConfigParser   │    │    Logger (Singleton)     │    │   History Buffer   │  ║
+║  │ vdev_policy.json │    │  INFO | SUCCESS | WARNING │    │  60-sample ring    │  ║
+║  │   (Thresholds)   │    │  ERROR | DEVICE           │    │    std::deque      │  ║
+║  └────────┬─────────┘    └─────────────┬─────────────┘    └─────────┬──────────┘  ║
+║           │ VDevConfig                 │ std::mutex RAII            │             ║
+║           ▼                            ▼                            ▼             ║
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║
+║  │                               DeviceManager                                 │  ║
+║  │   * mkfifo() -> open(O_RDWR|O_NONBLOCK) -> write() -> read()                │  ║
+║  │   * processQueryCommand (GET_CPU, GET_MEM, GET_LOAD, GET_JSON, GET_HEALTH)  │  ║
+║  │   * IOCTL: START(0x8001), STOP(0x8002), RESET(0x8003), STATS(0x8004), RATE  │  ║
+║  │   * DeviceStats: total_bytes_written, total_reads, total_ioctls, queries    │  ║
+║  └─────────────────────────────────────┬───────────────────────────────────────┘  ║
+║                                        │ queries live metrics                     ║
+║                                        ▼                                          ║
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║
+║  │                             TelemetryMonitor                                │  ║
+║  │   * /proc/stat    -> CPU tick delta -> cpu_usage_pct (%)                    │  ║
+║  │   * /proc/meminfo -> MemTotal, MemAvailable -> memory_used_mb (MB & %)      │  ║
+║  │   * /proc/loadavg -> 1m, 5m, 15m load averages & active/total threads       │  ║
+║  │   * /proc/uptime  -> System uptime (seconds)                                │  ║
+║  │   * Threshold Rule Evaluator -> HEALTHY, WARNING_CPU, WARNING_MEM           │  ║
+║  │   * toJsonString() -> Structured JSON Serialization                         │  ║
+║  └─────────────────────────────────────┬───────────────────────────────────────┘  ║
+║                                        │ writes stream/JSON                       ║
+║                                        ▼                                          ║
+║                             /tmp/vdevpulse (POSIX FIFO)                           ║
+╚════════════════════════════════════════│══════════════════════════════════════════╝
+                                         │ POSIX read() / write()
+                                         ▼
+                            User-Space Shell & Applications
+                            (cat /tmp/vdevpulse, vdevpulse query CMD)
 ```
 
 ---
@@ -47,10 +50,10 @@ VDevPulse is structured as a modular, single-process daemon with four loosely-co
 | Component | Class / Struct | Responsibility |
 | :--- | :--- | :--- |
 | **Logger** | `Logger` (Singleton) | Thread-safe color-coded log output to stdout and file |
-| **Policy Engine** | `ConfigParser`, `VDevConfig` | Load runtime settings from `vdev_policy.json` |
-| **Telemetry Engine** | `TelemetryMonitor`, `SystemTelemetry` | Parse `/proc` kernel FS; compute CPU%, RAM%, uptime |
-| **Device Manager** | `DeviceManager`, `DeviceState` | Create/open/read/write/close FIFO; handle IOCTL state |
-| **Daemon Entry Point** | `main()` | CLI dispatch, SIGINT/SIGTERM handling, main loop |
+| **Policy Engine** | `ConfigParser`, `VDevConfig` | Load runtime settings, thresholds, and format from `vdev_policy.json` |
+| **Telemetry Engine** | `TelemetryMonitor`, `SystemTelemetry` | Parse `/proc` kernel FS; compute CPU%, RAM%, loadavg, health status; JSON serialization; history buffer |
+| **Device Manager** | `DeviceManager`, `DeviceState`, `DeviceStats` | Create/open/read/write/close FIFO; process interactive query commands; handle IOCTL state & stats |
+| **Daemon Entry Point** | `main()` | CLI dispatch (`run`, `status`, `history`, `query`, `write`, `ioctl`), signal handling |
 
 ---
 
@@ -60,12 +63,15 @@ VDevPulse is structured as a modular, single-process daemon with four loosely-co
 ```cpp
 // include/vdevpulse/config.hpp
 struct VDevConfig {
-    std::string device_name         = "vdevpulse";      // Logical name of the virtual device
-    std::string device_path         = "/tmp/vdevpulse"; // FIFO node path on the filesystem
-    int         sampling_rate_ms    = 1000;              // Telemetry sampling interval (ms)
-    bool        enable_cpu_telemetry    = true;
-    bool        enable_memory_telemetry = true;
-    long        max_memory_threshold_mb = 4096;          // Alert if RAM usage exceeds this
+    std::string device_name                 = "vdevpulse";
+    std::string device_path                 = "/tmp/vdevpulse";
+    int         sampling_rate_ms            = 1000;
+    bool        enable_cpu_telemetry        = true;
+    bool        enable_memory_telemetry     = true;
+    double      cpu_alert_threshold_pct     = 85.0;
+    double      memory_alert_threshold_pct  = 90.0;
+    long        max_memory_threshold_mb     = 4096;
+    std::string output_format               = "text"; // "text" or "json"
 };
 ```
 
@@ -73,39 +79,37 @@ struct VDevConfig {
 ```cpp
 // include/vdevpulse/telemetry_monitor.hpp
 struct SystemTelemetry {
-    double cpu_usage_pct    = 0.0;  // CPU utilization as percentage
-    long   memory_total_mb  = 0;    // Total installed RAM in MB
-    long   memory_used_mb   = 0;    // Currently used RAM in MB
-    long   memory_free_mb   = 0;    // Currently available RAM in MB
-    double memory_usage_pct = 0.0;  // RAM utilization as percentage
-    long   uptime_seconds   = 0;    // System uptime from /proc/uptime
+    double      cpu_usage_pct       = 0.0;
+    long        memory_total_mb     = 0;
+    long        memory_used_mb      = 0;
+    long        memory_free_mb      = 0;
+    double      memory_usage_pct    = 0.0;
+    long        uptime_seconds      = 0;
+    double      load_1m             = 0.0;
+    double      load_5m             = 0.0;
+    double      load_15m            = 0.0;
+    int         running_processes   = 0;
+    int         total_processes     = 0;
+    std::string health_status       = "HEALTHY";
 };
 ```
 
-### 3.3.3 `DeviceState` — Virtual Device State Machine
+### 3.3.3 `DeviceStats` & IOCTL Command Enums
 ```cpp
 // include/vdevpulse/device_manager.hpp
-enum class DeviceState {
-    STOPPED,   // FIFO node not open; no I/O active
-    RUNNING,   // FIFO node open; read/write active
-    PAUSED     // Reserved for future hold-without-close semantics
-};
+enum class DeviceState { STOPPED, RUNNING, PAUSED };
 
-// Virtual IOCTL Command Codes
-constexpr unsigned long VDEV_IOCTL_START = 0x8001;
-constexpr unsigned long VDEV_IOCTL_STOP  = 0x8002;
-constexpr unsigned long VDEV_IOCTL_RESET = 0x8003;
-```
+constexpr unsigned long VDEV_IOCTL_START     = 0x8001;
+constexpr unsigned long VDEV_IOCTL_STOP      = 0x8002;
+constexpr unsigned long VDEV_IOCTL_RESET     = 0x8003;
+constexpr unsigned long VDEV_IOCTL_GET_STATS = 0x8004;
+constexpr unsigned long VDEV_IOCTL_SET_RATE  = 0x8005;
 
-### 3.3.4 `LogLevel` — Log Severity Enum
-```cpp
-// include/vdevpulse/logger.hpp
-enum class LogLevel {
-    INFO,     // General operational messages   (Cyan)
-    SUCCESS,  // Successful operations           (Green)
-    WARNING,  // Non-critical issues             (Yellow)
-    ERROR,    // Critical failures               (Red)
-    DEVICE    // Device I/O and IOCTL events     (Magenta)
+struct DeviceStats {
+    uint64_t total_bytes_written = 0;
+    uint64_t total_reads         = 0;
+    uint64_t total_ioctls        = 0;
+    uint64_t total_queries       = 0;
 };
 ```
 
@@ -131,7 +135,10 @@ classDiagram
         +int sampling_rate_ms
         +bool enable_cpu_telemetry
         +bool enable_memory_telemetry
+        +double cpu_alert_threshold_pct
+        +double memory_alert_threshold_pct
         +long max_memory_threshold_mb
+        +string output_format
     }
 
     class ConfigParser {
@@ -145,25 +152,36 @@ classDiagram
         +long memory_free_mb
         +double memory_usage_pct
         +long uptime_seconds
+        +double load_1m
+        +double load_5m
+        +double load_15m
+        +int running_processes
+        +int total_processes
+        +string health_status
     }
 
     class TelemetryMonitor {
-        +collectTelemetry() SystemTelemetry
+        +collectTelemetry(config VDevConfig) SystemTelemetry
         +printTelemetryDashboard(metrics SystemTelemetry) void
+        +toJsonString(metrics SystemTelemetry) string
+        +recordHistory(metrics SystemTelemetry) void
+        +printHistory() void
     }
 
     class DeviceManager {
         -string device_path_
         -int device_fd_
         -DeviceState state_
+        -DeviceStats stats_
         +initDevice(config VDevConfig) bool
         +openDevice() bool
         +writeData(buffer string) bool
         +readData() string
-        +sendIoctl(cmd ulong) bool
+        +sendIoctl(cmd ulong, arg ulong) bool
+        +processQueryCommand(cmd string, telemetry SystemTelemetry) string
         +closeDevice() void
         +getState() DeviceState
-        +getDevicePath() string
+        +getStats() DeviceStats
     }
 
     ConfigParser --> VDevConfig : produces
@@ -174,7 +192,7 @@ classDiagram
     TelemetryMonitor --> Logger : logs via
 ```
 
-### 3.4.2 Sequence Diagram — Telemetry Sampling & Device Write Cycle
+### 3.4.2 Sequence Diagram — Telemetry Sampling, Threshold Check & Device I/O
 
 ```mermaid
 sequenceDiagram
@@ -187,7 +205,7 @@ sequenceDiagram
     participant LOG as Logger
 
     Main->>CFG: loadPolicy("vdev_policy.json", config)
-    CFG->>LOG: log(INFO, "Loaded policy")
+    CFG->>LOG: log(INFO, "Loaded policy with thresholds")
     CFG-->>Main: VDevConfig populated
 
     Main->>DEV: initDevice(config)
@@ -200,17 +218,21 @@ sequenceDiagram
     DEV->>LOG: log(INFO, "Opened device descriptor")
 
     loop Every 1000ms while vdev_running
-        Main->>TEL: collectTelemetry()
-        TEL->>PROC: read /proc/stat
-        PROC-->>TEL: cpu tick counters
-        TEL->>PROC: read /proc/meminfo
-        PROC-->>TEL: memory counters
-        TEL->>PROC: read /proc/uptime
-        PROC-->>TEL: uptime seconds
+        Main->>TEL: collectTelemetry(config)
+        TEL->>PROC: read /proc/stat, /proc/meminfo, /proc/loadavg, /proc/uptime
+        PROC-->>TEL: raw kernel metrics
+        TEL->>TEL: evaluate threshold rules (health_status)
+        TEL->>TEL: recordHistory(metrics)
         TEL-->>Main: SystemTelemetry struct
 
-        Main->>TEL: printTelemetryDashboard(metrics)
-        Main->>DEV: writeData("TELEMETRY_SAMPLE CPU=X MEM=YMB")
+        alt JSON output mode
+            Main->>TEL: toJsonString(metrics)
+            TEL-->>Main: JSON string
+            Main->>DEV: writeData(json_string)
+        else Text dashboard mode
+            Main->>TEL: printTelemetryDashboard(metrics)
+            Main->>DEV: writeData(formatted_payload)
+        end
         DEV->>DEV: write to FIFO
         DEV->>LOG: log(DEVICE, "Wrote payload bytes")
     end
@@ -221,7 +243,7 @@ sequenceDiagram
     DEV->>DEV: close descriptor and remove FIFO
 ```
 
-### 3.4.3 State Machine Diagram — Virtual Device Lifecycle
+### 3.4.3 State Machine Diagram — Virtual Device Lifecycle & IOCTLs
 
 ```mermaid
 stateDiagram-v2
@@ -233,7 +255,8 @@ stateDiagram-v2
 
     NodeCreated --> Running : openDevice nonblocking
     Running --> Running : writeData or readData
-    Running --> Running : IOCTL START
+    Running --> Running : processQueryCommand
+    Running --> Running : IOCTL START / GET_STATS / SET_RATE
     Running --> Stopped : IOCTL STOP
     Stopped --> Running : IOCTL RESET
 
@@ -244,48 +267,8 @@ stateDiagram-v2
 
 ---
 
-## 3.5 Implementation Plan
-
-| Phase | Files | Description |
-| :--- | :--- | :--- |
-| Phase 1 | `logger.hpp`, `logger.cpp` | Implement Logger Singleton with mutex, ANSI colors, file output |
-| Phase 2 | `config.hpp`, `config.cpp` | Implement JSON string extraction, `VDevConfig` defaults |
-| Phase 3 | `telemetry_monitor.hpp`, `telemetry_monitor.cpp` | Implement `/proc` parsers for stat, meminfo, uptime |
-| Phase 4 | `device_manager.hpp`, `device_manager.cpp` | Implement FIFO lifecycle, read/write/ioctl, RAII destructor |
-| Phase 5 | `main.cpp` | Implement CLI dispatch (`run`/`status`/`write`/`ioctl`) and signal handling |
-| Phase 6 | `tests/`, `CMakeLists.txt` | Integrate CTest, write device and telemetry unit tests |
-
----
-
-## 3.6 Development Environment & Git Strategy
-
-### Toolchain
-| Tool | Version | Purpose |
-| :--- | :--- | :--- |
-| Compiler | GCC 15.2 (WSL2) | C++17 compilation |
-| Build System | CMake 3.28 | Build orchestration and CTest |
-| Target OS | Ubuntu 24.04 via WSL2 | POSIX runtime environment |
-| VCS | Git 2.45 | Version control |
-| IDE / Editor | VSCode + WSL Remote | Development |
-
-### Git Branching & Commit Convention
-- **Branch**: All development on `main`.
-- **Commit Naming**: Stage-prefixed commit messages: `[Stage N] Description`
-- **Progress Commits**: One commit per SDLC stage to demonstrate continuous progress to reviewers.
-
----
-
-## 3.7 Version Control & Progress Evidence
+## 3.5 Version Control & Progress Evidence
 
 - **SDLC Phase**: Stage 3 — System Design & Architecture
 - **Git Commit**: `[Stage 3] System Architecture, UML diagrams & class interfaces`
-- **Evidence**: All four `.hpp` header files committed with complete class declarations.
-
----
-
-## 3.8 Roadmap for Next Stage (Stage 4)
-
-- Implement all `.cpp` source files following the Phase 1–5 implementation plan
-- Construct the `main.cpp` CLI dispatcher with `SIGINT`/`SIGTERM` signal handling
-- Validate compilation with `cmake .. && make -j4`
-- Log and document any issues encountered during integration
+- **Evidence**: Class declarations, UML diagrams, and data structures synchronized with code.
