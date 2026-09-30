@@ -22,8 +22,9 @@ void printUsage() {
     std::cout << "Usage:\n";
     std::cout << "  vdevpulse run [policy.json] [--json] Start virtual device & telemetry loop\n";
     std::cout << "  vdevpulse status [--json]            Inspect current system telemetry\n";
+    std::cout << "  vdevpulse top                        Inspect top resource-consuming processes\n";
     std::cout << "  vdevpulse history                    Display accumulated telemetry history\n";
-    std::cout << "  vdevpulse query <CMD>                Query virtual device (GET_CPU, GET_MEM, GET_LOAD, GET_JSON, GET_HEALTH, PING)\n";
+    std::cout << "  vdevpulse query <CMD>                Query virtual device (GET_CPU, GET_MEM, GET_LOAD, GET_TOP, GET_JSON, GET_HEALTH, PING)\n";
     std::cout << "  vdevpulse write <message>            Write payload to virtual device node\n";
     std::cout << "  vdevpulse ioctl <start|stop|reset|stats> Send IOCTL command to virtual device\n";
     std::cout << "------------------------------------------------------\n";
@@ -101,9 +102,26 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    if (cmd == "top") {
+        auto procs = TelemetryMonitor::getTopProcesses(5);
+        std::cout << "======================================================\n";
+        std::cout << "        TOP PROCESSES BY MEMORY CONSUMPTION           \n";
+        std::cout << "======================================================\n";
+        std::cout << "PID     NAME                    RAM (MB)\n";
+        std::cout << "------------------------------------------------------\n";
+        for (const auto& p : procs) {
+            std::cout << p.pid << "\t" << p.name;
+            if (p.name.length() < 8) std::cout << "\t\t\t";
+            else if (p.name.length() < 16) std::cout << "\t\t";
+            else std::cout << "\t";
+            std::cout << p.memory_rss_mb << " MB\n";
+        }
+        std::cout << "------------------------------------------------------\n";
+        return 0;
+    }
+
     if (cmd == "history") {
         VDevConfig cfg;
-        // Take a few rapid samples to demonstrate history buffer
         for (int i = 0; i < 5; ++i) {
             auto m = TelemetryMonitor::collectTelemetry(cfg);
             TelemetryMonitor::recordHistory(m);
@@ -115,7 +133,7 @@ int main(int argc, char* argv[]) {
 
     if (cmd == "query") {
         if (argc < 3) {
-            std::cout << "Usage: vdevpulse query <GET_CPU|GET_MEM|GET_LOAD|GET_JSON|GET_HEALTH|PING>\n";
+            std::cout << "Usage: vdevpulse query <GET_CPU|GET_MEM|GET_LOAD|GET_TOP|GET_JSON|GET_HEALTH|PING>\n";
             return 1;
         }
         std::string query_cmd = argv[2];

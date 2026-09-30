@@ -6,6 +6,13 @@
 #include <vector>
 #include <deque>
 
+struct ProcessInfo {
+    int pid = 0;
+    std::string name = "";
+    long memory_rss_mb = 0;
+    unsigned long cpu_ticks = 0;
+};
+
 struct SystemTelemetry {
     double cpu_usage_pct = 0.0;
     long memory_total_mb = 0;
@@ -19,6 +26,7 @@ struct SystemTelemetry {
     int running_processes = 0;
     int total_processes = 0;
     std::string health_status = "HEALTHY";
+    std::vector<ProcessInfo> top_processes;
 };
 
 class TelemetryMonitor {
@@ -26,6 +34,7 @@ public:
     TelemetryMonitor() = default;
 
     static SystemTelemetry collectTelemetry(const VDevConfig& config = VDevConfig());
+    static std::vector<ProcessInfo> getTopProcesses(size_t limit = 3);
     static void printTelemetryDashboard(const SystemTelemetry& metrics);
     static std::string toJsonString(const SystemTelemetry& metrics);
     static void recordHistory(const SystemTelemetry& metrics);

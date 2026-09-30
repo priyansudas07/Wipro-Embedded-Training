@@ -121,6 +121,18 @@ std::string DeviceManager::processQueryCommand(const std::string& cmd, const Sys
     if (trimmed == "GET_HEALTH") {
         return "HEALTH=" + telemetry.health_status;
     }
+    if (trimmed == "GET_TOP" || trimmed == "GET_TOP_PROCESSES") {
+        if (telemetry.top_processes.empty()) return "TOP_PROCESSES=NONE";
+        std::stringstream ss;
+        ss << "TOP_PROCESSES=";
+        for (size_t i = 0; i < telemetry.top_processes.size(); ++i) {
+            ss << "[PID:" << telemetry.top_processes[i].pid << " "
+               << telemetry.top_processes[i].name << " "
+               << telemetry.top_processes[i].memory_rss_mb << "MB]"
+               << (i + 1 < telemetry.top_processes.size() ? ", " : "");
+        }
+        return ss.str();
+    }
     if (trimmed == "GET_JSON") {
         return TelemetryMonitor::toJsonString(telemetry);
     }

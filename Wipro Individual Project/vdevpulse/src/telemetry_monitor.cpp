@@ -7,10 +7,73 @@
 #include <unistd.h>
 #include <filesystem>
 #include <numeric>
+#include <algorithm>
+#include <cctype>
 
 namespace fs = std::filesystem;
 
 std::deque<SystemTelemetry> TelemetryMonitor::history_buffer_;
+
+std::vector<ProcessInfo> TelemetryMonitor::getTopProcesses(size_t limit) {
+    std::vector<ProcessInfo> procs;
+
+    if (!fs::exists("/proc")) return procs;
+
+    for (const auto& entry : fs::directory_iterator("/proc")) {
+        if (!entry.is_directory()) continue;
+
+        std::string filename = entry.path().filename().string();
+        if (filename.empty() || !std::all_of(filename.begin(), filename.end(), ::isdigit)) {
+            continue;
+        }
+
+        int pid = 0;
+        try {
+            pid = std::stoi(filename);
+        } catch (...) {
+            continue;
+        }
+
+        ProcessInfo p;
+        p.pid = pid;
+
+        // 1. Read process name from /proc/[pid]/comm
+        std::ifstream comm_file(entry.path() / "comm");
+        if (comm_file.is_open()) {
+            std::getline(comm_file, p.name);
+        }
+
+        // 2. Read physical memory RSS from /proc/[pid]/status
+        std::ifstream status_file(entry.path() / "status");
+        if (status_file.is_open()) {
+            std::string line;
+            while (std::getline(status_file, line)) {
+                if (line.rfind("VmRSS:", 0) == 0) {
+                    std::stringstream ss(line.substr(6));
+                    long rss_kb = 0;
+                    ss >> rss_kb;
+                    p.memory_rss_mb = rss_kb / 1024;
+                    break;
+                }
+            }
+        }
+
+        if (p.memory_rss_mb > 0) {
+            procs.push_back(p);
+        }
+    }
+
+    // Sort descending by memory consumption
+    std::sort(procs.begin(), procs.end(), [](const ProcessInfo& a, const ProcessInfo& b) {
+        return a.memory_rss_mb > b.memory_rss_mb;
+    });
+
+    if (procs.size() > limit) {
+        procs.resize(limit);
+    }
+
+    return procs;
+}
 
 SystemTelemetry TelemetryMonitor::collectTelemetry(const VDevConfig& config) {
     SystemTelemetry t;
@@ -77,7 +140,10 @@ SystemTelemetry TelemetryMonitor::collectTelemetry(const VDevConfig& config) {
         }
     }
 
-    // 5. Automated Health & Threshold Rule Evaluation
+    // 5. Ingest Top Resource Consuming Processes
+    t.top_processes = getTopProcesses(3);
+
+    // 6. Automated Health & Threshold Rule Evaluation
     t.health_status = "HEALTHY";
     if (t.cpu_usage_pct > config.cpu_alert_threshold_pct) {
         t.health_status = "WARNING_CPU_OVERLOAD";
@@ -110,6 +176,16 @@ void TelemetryMonitor::printTelemetryDashboard(const SystemTelemetry& metrics) {
     std::cout << "  Load Averages    : " << std::setprecision(2) << metrics.load_1m << " (1m), "
               << metrics.load_5m << " (5m), " << metrics.load_15m << " (15m)" << std::endl;
     std::cout << "  Active Processes : " << metrics.running_processes << " running / " << metrics.total_processes << " total" << std::endl;
+    
+    if (!metrics.top_processes.empty()) {
+        std::cout << "  Top Consumers    :" << std::endl;
+        for (size_t i = 0; i < metrics.top_processes.size(); ++i) {
+            std::cout << "    " << (i + 1) << ". [PID " << metrics.top_processes[i].pid << "] "
+                      << std::left << std::setw(16) << metrics.top_processes[i].name
+                      << " (RAM: " << metrics.top_processes[i].memory_rss_mb << " MB)" << std::endl;
+        }
+    }
+
     std::cout << "  System Uptime    : " << metrics.uptime_seconds << " seconds" << std::endl;
     std::cout << "------------------------------------------------------" << std::endl;
 }
@@ -127,7 +203,15 @@ std::string TelemetryMonitor::toJsonString(const SystemTelemetry& metrics) {
     ss << "  \"load_15m\": " << std::fixed << std::setprecision(2) << metrics.load_15m << ",\n";
     ss << "  \"running_processes\": " << metrics.running_processes << ",\n";
     ss << "  \"total_processes\": " << metrics.total_processes << ",\n";
-    ss << "  \"uptime_seconds\": " << metrics.uptime_seconds << "\n";
+    ss << "  \"uptime_seconds\": " << metrics.uptime_seconds << ",\n";
+    ss << "  \"top_processes\": [\n";
+    for (size_t i = 0; i < metrics.top_processes.size(); ++i) {
+        ss << "    {\"pid\": " << metrics.top_processes[i].pid
+           << ", \"name\": \"" << metrics.top_processes[i].name << "\""
+           << ", \"memory_rss_mb\": " << metrics.top_processes[i].memory_rss_mb << "}"
+           << (i + 1 < metrics.top_processes.size() ? ",\n" : "\n");
+    }
+    ss << "  ]\n";
     ss << "}";
     return ss.str();
 }
