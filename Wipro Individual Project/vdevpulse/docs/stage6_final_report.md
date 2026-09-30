@@ -67,9 +67,26 @@ cat /tmp/vdevpulse
 | **100% Test Pass Rate** | CMake CTest suite verifying all device manager, IOCTL, query, and telemetry assertions |
 | **Full SDLC Artifacts** | All 6 stage documentation files, presentation guide, and compiled PDF engineering report |
 
+## 6.4 Execution Screenshots
+
+### Continuous Daemon Streaming & Telemetry Dashboard
+![Daemon Streaming](screenshots/vdevpulse_daemon_stream.png)
+
+### Structured JSON Telemetry Export (`status --json`)
+![JSON Export](screenshots/vdevpulse_status_json.png)
+
+### Top Background Process Inspection (`top 5`)
+![Top Processes](screenshots/vdevpulse_top_processes.png)
+
+### Synchronous Interactive Query Protocol (`query <CMD>`)
+![Query Protocol](screenshots/vdevpulse_queries.png)
+
+### Historical Telemetry Ring Buffer (`history`)
+![History Buffer](screenshots/vdevpulse_history.png)
+
 ---
 
-## 6.4 Version Control & Progress Evidence
+## 6.5 Version Control & Progress Evidence
 
 - **SDLC Phase**: Stage 6 — Final Delivery & Presentation
 - **Git Commit**: `[Stage 6] Final deployment guide, presentation guide & project delivery`

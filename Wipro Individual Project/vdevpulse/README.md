@@ -110,6 +110,23 @@ cat /tmp/vdevpulse
 | `./vdevpulse write <message>` | Writes a custom payload string to the virtual device node |
 | `cat /tmp/vdevpulse` | Reads real-time telemetry stream from the device node |
 
+## Execution Screenshots & Live Demonstration
+
+### 1. Continuous Daemon Streaming & Telemetry Dashboard
+![Continuous Daemon Streaming](docs/screenshots/vdevpulse_daemon_stream.png)
+
+### 2. Instantaneous JSON Export (`status --json`)
+![Structured JSON Output](docs/screenshots/vdevpulse_status_json.png)
+
+### 3. Top Background Process Inspector (`top 5`)
+![Top Background Process Scanner](docs/screenshots/vdevpulse_top_processes.png)
+
+### 4. Interactive Synchronous Query Protocol (`query <CMD>`)
+![Interactive Query Protocol](docs/screenshots/vdevpulse_queries.png)
+
+### 5. In-Memory Historical Telemetry Ring Buffer (`history`)
+![Historical Ring Buffer](docs/screenshots/vdevpulse_history.png)
+
 ## Documentation
 
 - [Project Report (PDF)](docs/VDevPulse_Project_Documentation.pdf)
