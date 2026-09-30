@@ -52,14 +52,15 @@ vdevpulse/
 - **CPU Utilization**: Parsed from `/proc/stat` tick distribution.
 - **RAM Memory**: Parsed from `/proc/meminfo` prioritizing `MemAvailable`.
 - **System Load & Threads**: Parsed from `/proc/loadavg` reporting 1m, 5m, 15m load averages and process thread counts.
+- **Top Background Process Inspector**: `getTopProcesses(size_t limit)` scans numeric `/proc/[PID]/` directories, reads executable names from `/proc/[PID]/comm`, extracts physical memory usage from `/proc/[PID]/status` (`VmRSS`), and ranks highest memory consumers descending.
 - **Threshold Health Rule Evaluator**: Assigns dynamic `health_status` (`HEALTHY`, `WARNING_CPU_OVERLOAD`, `WARNING_MEMORY_PRESSURE`, `CRITICAL_RESOURCE_PRESSURE`).
-- **JSON Serializer**: `toJsonString()` outputs compact structured JSON.
+- **JSON Serializer**: `toJsonString()` outputs compact structured JSON with system metrics and top consumer process arrays.
 - **History Ring Buffer**: `std::deque` storing the last 60 telemetry snapshots for inspection (`vdevpulse history`).
 
 ### 4.2.4 DeviceManager — `device_manager.hpp` / `device_manager.cpp`
 - **Virtual Character Device**: Creates named FIFO at `/tmp/vdevpulse` via `mkfifo()`.
 - **Non-Blocking I/O**: Opens with `O_RDWR | O_NONBLOCK` to allow non-blocking writes.
-- **Query Protocol**: `processQueryCommand()` handles targeted queries (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_JSON`, `GET_HEALTH`, `PING`).
+- **Query Protocol**: `processQueryCommand()` handles targeted queries (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_TOP`, `GET_JSON`, `GET_HEALTH`, `PING`).
 - **Extended IOCTLs**: Handles `START`, `STOP`, `RESET`, `GET_STATS`, and `SET_RATE` while maintaining cumulative `DeviceStats`.
 
 ---
@@ -70,8 +71,9 @@ vdevpulse/
 | :--- | :--- | :--- |
 | `run` | `vdevpulse run [policy.json] [--json]` | Continuous daemon loop streaming telemetry (text or JSON) to `/tmp/vdevpulse` |
 | `status` | `vdevpulse status [--json]` | Instantaneous telemetry snapshot (dashboard or JSON format) |
+| `top` | `vdevpulse top [limit]` | Live inspection of top background processes by memory consumption (default: 5) |
 | `history` | `vdevpulse history` | Displays circular ring buffer table of recent telemetry snapshots |
-| `query` | `vdevpulse query <CMD>` | Interactive query (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_JSON`, `GET_HEALTH`, `PING`) |
+| `query` | `vdevpulse query <CMD>` | Interactive query (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_TOP`, `GET_JSON`, `GET_HEALTH`, `PING`) |
 | `write` | `vdevpulse write <message>` | Writes custom diagnostic string payload to the device node |
 | `ioctl` | `vdevpulse ioctl <start\|stop\|reset\|stats>` | Sends virtual IOCTL command to manage device state and query I/O stats |
 

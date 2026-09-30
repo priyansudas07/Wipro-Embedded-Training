@@ -15,9 +15,9 @@ Functional requirements define the specific behaviours and capabilities the syst
 | **FR-07** | `TelemetryMonitor` | The system shall parse `/proc/stat` to compute CPU utilization as a percentage of non-idle CPU ticks over total CPU ticks. | High |
 | **FR-08** | `TelemetryMonitor` | The system shall parse `/proc/meminfo` for `MemTotal`, `MemFree`, `MemAvailable` to compute RAM usage in MB and percentage. | High |
 | **FR-09** | `TelemetryMonitor` | The system shall parse `/proc/uptime` to report system uptime in seconds. | Medium |
-| **FR-10** | `TelemetryMonitor` | The system shall parse `/proc/loadavg` to report 1m, 5m, 15m load averages and active/total scheduled thread counts. | High |
+| **FR-10** | `TelemetryMonitor` | The system shall parse `/proc/loadavg` and `/proc/[PID]/` to report load averages, thread counts, and top memory/CPU consuming processes. | High |
 | **FR-11** | `TelemetryMonitor` | The system shall evaluate CPU and RAM utilization against configurable thresholds in `vdev_policy.json`, dynamically assigning `health_status` (`HEALTHY`, `WARNING_CPU_OVERLOAD`, `WARNING_MEMORY_PRESSURE`). | High |
-| **FR-12** | `DeviceManager` | The system shall implement an interactive query protocol responding to commands (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_JSON`, `GET_HEALTH`, `PING`). | High |
+| **FR-12** | `DeviceManager` | The system shall implement an interactive query protocol responding to commands (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_TOP`, `GET_JSON`, `GET_HEALTH`, `PING`). | High |
 | **FR-13** | `TelemetryMonitor` | The system shall support structured JSON serialization (`toJsonString`) for machine-readable streaming. | Medium |
 | **FR-14** | `TelemetryMonitor` | The system shall maintain an in-memory circular history buffer storing recent telemetry snapshots for trend inspection (`vdevpulse history`). | Medium |
 | **FR-15** | `ConfigParser` | The system shall load device configuration, threshold limits, and output format from a JSON policy file with safe fallback to compiled defaults. | Medium |

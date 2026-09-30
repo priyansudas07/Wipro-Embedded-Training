@@ -6,10 +6,11 @@
 
 **Objective**: Design and implement a lightweight Linux system software daemon in Modern C++17 that:
 1. Creates and manages a **virtual Linux character device node** (`/tmp/vdevpulse`) using POSIX FIFO pipes, emulating the standard Linux `/dev/*` device interface.
-2. Continuously **monitors real-time system telemetry** (CPU utilization, RAM usage, system uptime) by parsing Linux kernel's synthetic filesystem interfaces (`/proc/stat`, `/proc/meminfo`, `/proc/uptime`).
+2. Continuously **monitors real-time system telemetry** (CPU utilization, RAM usage, system load averages, and uptime) alongside active process subdirectories (`/proc/[PID]/`) to isolate top resource-consuming background applications.
 3. Provides a **POSIX-standard device I/O interface** supporting `read()`, `write()`, and virtual `ioctl()` command operations.
-4. Implements a **thread-safe logging subsystem** for runtime diagnostics.
-5. Loads **dynamic runtime policies** from a JSON configuration file without requiring binary recompilation.
+4. Implements an **automated threshold alert engine** and **interactive text query protocol** (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_TOP`, `GET_JSON`, `GET_HEALTH`).
+5. Implements a **thread-safe logging subsystem** for runtime diagnostics.
+6. Loads **dynamic runtime policies** from a JSON configuration file without requiring binary recompilation.
 
 ---
 
@@ -61,13 +62,16 @@ Modern embedded Linux systems frequently face resource contention and unexpected
 
 ### In Scope
 - Virtual POSIX character device creation and lifecycle management using named FIFO pipes (`mkfifo`).
-- Real-time parsing of three kernel `/proc` interfaces: `/proc/stat` (CPU), `/proc/meminfo` (RAM), and `/proc/uptime` (Uptime).
-- Virtual IOCTL command interface (`VDEV_IOCTL_START`, `VDEV_IOCTL_STOP`, `VDEV_IOCTL_RESET`).
-- Color-coded terminal telemetry dashboard output.
-- Dynamic JSON policy configuration loading (`configs/vdev_policy.json`).
+- Real-time parsing of Linux kernel `/proc` interfaces: `/proc/stat` (CPU), `/proc/meminfo` (RAM), `/proc/loadavg` (Load averages & threads), `/proc/uptime` (Uptime), and process scanning (`/proc/[PID]/`).
+- Top resource-consuming background process detection (PID, executable name, physical RAM RSS).
+- Virtual IOCTL command interface (`START`, `STOP`, `RESET`, `GET_STATS`, `SET_RATE`).
+- Interactive query command protocol (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_TOP`, `GET_JSON`, `GET_HEALTH`, `PING`).
+- Color-coded terminal telemetry dashboard output and structured JSON export streaming.
+- In-memory circular telemetry history buffer (`std::deque` 60 samples).
+- Dynamic JSON policy configuration loading with threshold alerts (`configs/vdev_policy.json`).
 - Thread-safe structured logging with 5 severity levels: `INFO`, `SUCCESS`, `WARNING`, `ERROR`, `DEVICE`.
 - Automated CMake CTest unit testing suite (`device_test`, `telemetry_test`).
-- Full 6-stage SDLC engineering documentation.
+- Full 6-stage SDLC engineering documentation and official PDF report.
 
 ### Out of Scope
 - Direct kernel module (`.ko`) compilation requiring root `insmod`.

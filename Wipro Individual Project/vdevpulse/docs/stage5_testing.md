@@ -20,8 +20,9 @@ VDevPulse employs automated unit testing using a CTest-integrated CMake build. T
 | **TC-DEV-06** | IOCTL STOP | `sendIoctl(VDEV_IOCTL_STOP)` | Returns `true`; state is `STOPPED` | **PASS** |
 | **TC-DEV-07** | Query PING | `processQueryCommand("PING", t)` | Returns `"PONG"` | **PASS** |
 | **TC-DEV-08** | Query GET_CPU | `processQueryCommand("GET_CPU", t)` | Returns string containing `"CPU_PCT="` | **PASS** |
-| **TC-DEV-09** | Query GET_HEALTH | `processQueryCommand("GET_HEALTH", t)` | Returns `"HEALTH=HEALTHY"` | **PASS** |
-| **TC-DEV-10** | Device Cleanup | `closeDevice()` | Closes fd; removes FIFO node | **PASS** |
+| **TC-DEV-09** | Query GET_TOP | `processQueryCommand("GET_TOP", t)` | Returns string containing `"TOP_CONSUMER="` | **PASS** |
+| **TC-DEV-10** | Query GET_HEALTH | `processQueryCommand("GET_HEALTH", t)` | Returns `"HEALTH=HEALTHY"` | **PASS** |
+| **TC-DEV-11** | Device Cleanup | `closeDevice()` | Closes fd; removes FIFO node | **PASS** |
 
 ---
 
@@ -34,9 +35,10 @@ VDevPulse employs automated unit testing using a CTest-integrated CMake build. T
 | **TC-TEL-03** | System Uptime | `collectTelemetry(cfg)` | `uptime_seconds >= 0` | **PASS** |
 | **TC-TEL-04** | System Load Average | `collectTelemetry(cfg)` | `load_1m >= 0.0` | **PASS** |
 | **TC-TEL-05** | Total Processes Count | `collectTelemetry(cfg)` | `total_processes >= 0` | **PASS** |
-| **TC-TEL-06** | Health Status Evaluated | `collectTelemetry(cfg)` | `!health_status.empty()` | **PASS** |
-| **TC-TEL-07** | JSON Serialization | `toJsonString(metrics)` | Contains `"health_status"` and `"load_1m"` | **PASS** |
-| **TC-TEL-08** | History Ring Buffer | `recordHistory(metrics)` | `!getHistory().empty()` | **PASS** |
+| **TC-TEL-06** | Top Process Scanner | `getTopProcesses(5)` | Returns sorted vector of active processes | **PASS** |
+| **TC-TEL-07** | Health Status Evaluated | `collectTelemetry(cfg)` | `!health_status.empty()` | **PASS** |
+| **TC-TEL-08** | JSON Serialization | `toJsonString(metrics)` | Contains `"health_status"` and `"top_processes"` | **PASS** |
+| **TC-TEL-09** | History Ring Buffer | `recordHistory(metrics)` | `!getHistory().empty()` | **PASS** |
 
 ---
 
