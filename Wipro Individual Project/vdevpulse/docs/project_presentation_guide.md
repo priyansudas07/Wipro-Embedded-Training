@@ -9,7 +9,7 @@ This guide is prepared for the final mentor evaluation and technical presentatio
 **Project Name**: VDevPulse — Virtual Device Interface & System Telemetry Monitor
 
 **One-line Summary**:
-> VDevPulse is a Modern C++17 Linux system daemon that creates a virtual POSIX character device interface at `/tmp/vdevpulse` while monitoring real-time CPU, RAM, and system uptime telemetry directly from Linux kernel `/proc` filesystem interfaces.
+> VDevPulse is a Modern C++17 Linux system software application that creates a virtual POSIX character device interface at `/tmp/vdevpulse` while monitoring real-time CPU utilization, RAM pressure, system load averages, and uptime directly from Linux kernel `/proc` filesystem interfaces, featuring an automated threshold alert engine and JSON export capabilities.
 
 ---
 
@@ -18,13 +18,13 @@ This guide is prepared for the final mentor evaluation and technical presentatio
 ### Why I Built This (Engineering Rationale)
 1. **Low-Overhead Embedded Monitoring**: Edge devices (IoT gateways, Raspberry Pi, industrial automation controllers) have constrained CPU and memory. Running a heavy Python daemon or Prometheus agent (50–200 MB RSS) is wasteful. VDevPulse delivers the same core health metrics in under 15 MB RSS.
 2. **Standard POSIX Device Abstraction**: Instead of writing a complex REST API or requiring external SDKs, VDevPulse implements the classic UNIX philosophy (*"everything is a file"*). Any process can query metrics by simply reading `/tmp/vdevpulse`.
-3. **Hands-On Linux Systems Programming**: Combines POSIX system calls (`mkfifo`, `open`, `read`, `write`, `close`), signal handling, `/proc` virtual filesystem parsing, and thread-safe C++17 OOP design into a cohesive system.
+3. **Hands-On Linux Systems Programming**: Combines POSIX system calls (`mkfifo`, `open`, `read`, `write`, `close`), signal handling, `/proc` virtual filesystem parsing (`/proc/stat`, `/proc/meminfo`, `/proc/loadavg`, `/proc/uptime`), and thread-safe C++17 OOP design into a cohesive system.
 4. **Safe User-Space Emulation**: Developing kernel-space `.ko` modules carries kernel-panic risks and requires root privileges. Emulating character device behavior via user-space named pipes provides safety and 100% portability.
 
 ### How It Is Useful & Practical Applications
 - **Embedded Health Watchdogs**: Supervisory daemons can poll `/tmp/vdevpulse` to detect runaway processes and trigger auto-recovery before system brownouts occur.
-- **Zero-Dependency Diagnostics**: Single standalone binary that runs on any Linux distribution (Kernel &ge; 4.15) with zero third-party library installations.
-- **Dynamic Control**: Supports virtual IOCTL commands (`START`, `STOP`, `RESET`) to control data streaming dynamically at runtime.
+- **Zero-SDK Diagnostic Integration**: Any external application (written in C, C++, Python, Rust, or Bash) can query live metrics simply by reading the device node.
+- **Dynamic Control & Query Protocol**: Supports virtual IOCTL commands (`START`, `STOP`, `RESET`, `GET_STATS`) and text queries (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_JSON`, `GET_HEALTH`).
 
 ---
 
@@ -35,17 +35,17 @@ This guide is prepared for the final mentor evaluation and technical presentatio
 | Module | Responsibility |
 | :--- | :--- |
 | `Logger` | Thread-safe, color-coded logging (`std::mutex` + RAII) |
-| `ConfigParser` | JSON policy loading with safe fallback to defaults |
-| `TelemetryMonitor` | Reads `/proc/stat`, `/proc/meminfo`, `/proc/uptime` |
-| `DeviceManager` | POSIX FIFO lifecycle: `mkfifo` → `open` → `read/write` → `ioctl` → `close` |
+| `ConfigParser` | JSON policy loading with threshold definitions and safe fallback |
+| `TelemetryMonitor` | Reads `/proc/stat`, `/proc/meminfo`, `/proc/loadavg`, `/proc/uptime`, JSON serialization, and history buffer |
+| `DeviceManager` | POSIX FIFO lifecycle, query command protocol, IOCTL state machine, and I/O statistics |
 
 **Data Flow**:
 ```
-JSON Config → VDevConfig → DeviceManager (mkfifo /tmp/vdevpulse)
+JSON Policy → VDevConfig → DeviceManager (mkfifo /tmp/vdevpulse)
                                   ↑
-            TelemetryMonitor ← /proc/stat, /proc/meminfo, /proc/uptime
+      TelemetryMonitor ← /proc/stat, /proc/meminfo, /proc/loadavg, /proc/uptime
                                   ↓
-            Payload written to FIFO → User reads with cat /tmp/vdevpulse
+      Stream/JSON payload written to FIFO → Client reads with cat /tmp/vdevpulse
 ```
 
 ---
@@ -55,59 +55,59 @@ JSON Config → VDevConfig → DeviceManager (mkfifo /tmp/vdevpulse)
 ### Virtual Character Device (`DeviceManager`)
 - Uses `mkfifo()` to create a named pipe at `/tmp/vdevpulse`, simulating how Linux character device nodes work under `/dev/`.
 - Opens with `O_RDWR | O_NONBLOCK` — avoids blocking the daemon when no reader is attached.
-- Supports `writeData()`, `readData()`, and virtual `sendIoctl()` with state tracking (`STOPPED` / `RUNNING` / `PAUSED`).
+- Supports `writeData()`, `readData()`, `processQueryCommand()`, and virtual `sendIoctl()` with state tracking.
 
-### CPU Telemetry (`/proc/stat`)
-- Reads the `cpu` aggregate line with fields: `user`, `nice`, `system`, `idle`, `iowait`, `irq`, `softirq`, `steal`.
-- Formula:
-  - `idle_time = idle + iowait`
-  - `non_idle_time = user + nice + system + irq + softirq + steal`
-  - `cpu_usage_pct = (non_idle_time / total_time) × 100`
+### System Load & Multi-Source Telemetry (`TelemetryMonitor`)
+- **CPU Utilization**: Parsed from `/proc/stat` tick distribution.
+- **RAM Pressure**: Parsed from `/proc/meminfo` prioritizing `MemAvailable`.
+- **System Load Averages**: Parsed from `/proc/loadavg` reporting 1m, 5m, 15m load averages and active/total thread counts.
+- **System Uptime**: Parsed from `/proc/uptime`.
 
-### RAM Telemetry (`/proc/meminfo`)
-- Extracts `MemTotal`, `MemFree`, `MemAvailable` (in kB).
-- Uses `MemAvailable` (preferred — accounts for reclaimable cache) over `MemFree`.
-- `memory_used_mb = (MemTotal – MemAvailable) / 1024`
+### Automated Threshold Alert Engine
+- Evaluates CPU and RAM utilization against configurable thresholds in `vdev_policy.json`.
+- Dynamically sets health status (`HEALTHY`, `WARNING_CPU_OVERLOAD`, `WARNING_MEMORY_PRESSURE`, `CRITICAL_RESOURCE_PRESSURE`) and logs diagnostic warnings.
 
-### Thread-Safe Logger
+### Thread-Safe Logger & History Buffer
 - Singleton pattern: `Logger::getInstance()` returns a static local instance.
-- Every `log()` call acquires `std::lock_guard<std::mutex>` before writing — safe for concurrent use.
-- ANSI escape codes produce color-coded terminal output by severity level.
-
-### Signal Handling
-- `signal(SIGINT, signalHandler)` and `signal(SIGTERM, signalHandler)` registered in `main()`.
-- Handler flips `std::atomic<bool> vdev_running = false`.
-- Main loop exits; `DeviceManager` destructor (`~DeviceManager()`) automatically calls `closeDevice()` — RAII guarantee.
+- Every `log()` call acquires `std::lock_guard<std::mutex>` before writing.
+- In-memory circular buffer (`std::deque`) records the last 60 telemetry snapshots for historical analysis.
 
 ---
 
 ## 5. Live Demonstration Script (3 min)
 
 ```bash
-# Step 1: Build
+# Step 1: Build & Run Tests
 cd "Wipro Individual Project/vdevpulse/build"
 cmake .. && make -j$(nproc)
-
-# Step 2: Run all unit tests
 ctest --output-on-failure
 # Expected: 100% tests passed, 0 tests failed out of 2
 
-# Step 3: Launch daemon
-./vdevpulse run ../configs/vdev_policy.json
-
-# Step 4: In a second terminal — read virtual device
-cat /tmp/vdevpulse
-
-# Step 5: Send IOCTL commands
-./vdevpulse ioctl start
-./vdevpulse ioctl stop
-./vdevpulse ioctl reset
-
-# Step 6: Single status snapshot
+# Step 2: Show Instantaneous Telemetry Dashboard
 ./vdevpulse status
 
-# Step 7: Graceful shutdown
-Ctrl+C    (observe "shutting down cleanly" log message)
+# Step 3: Show Structured JSON Output Mode
+./vdevpulse status --json
+
+# Step 4: Show Historical Telemetry Buffer
+./vdevpulse history
+
+# Step 5: Test Interactive Device Queries
+./vdevpulse query GET_CPU
+./vdevpulse query GET_LOAD
+./vdevpulse query GET_HEALTH
+./vdevpulse query PING
+
+# Step 6: Query Device IOCTL Statistics
+./vdevpulse ioctl stats
+
+# Step 7: Launch Continuous Daemon Loop
+./vdevpulse run ../configs/vdev_policy.json
+
+# (In a second terminal) Read live stream:
+cat /tmp/vdevpulse
+
+# Stop daemon with Ctrl + C (clean shutdown)
 ```
 
 ---
@@ -120,20 +120,14 @@ Ctrl+C    (observe "shutting down cleanly" log message)
 ### Q2: Why use `/proc` instead of a kernel driver or eBPF?
 **A**: Reading `/proc` provides 100% portability across all Linux kernels ≥ 4.15 without needing root privileges for module insertion or fighting eBPF verifier restrictions. It retrieves hardware metrics with sub-millisecond latency and near-zero CPU overhead.
 
-### Q3: Why is this better than just running `top` or a Python script?
-**A**: `top` is interactive and cannot be queried as a standard device stream. A Python daemon consumes 50–200 MB RAM and requires an interpreter runtime. VDevPulse runs in under 15 MB RSS with zero runtime dependencies and exposes a standard POSIX device I/O interface.
+### Q3: How does the Threshold Alert Engine work?
+**A**: `vdev_policy.json` defines alert thresholds (e.g., CPU > 85%, RAM > 90%). On every sampling cycle, `TelemetryMonitor` evaluates live metrics against these limits and updates `health_status`, logging warning alerts whenever resource limits are exceeded.
 
-### Q4: How does thread safety work in the Logger?
-**A**: Every call to `Logger::log()` acquires `std::lock_guard<std::mutex>` in its first line. The lock guard is RAII — it locks `mutex_` on construction and automatically releases it when the guard goes out of scope, even if an exception is thrown.
+### Q4: How are System Load Averages extracted?
+**A**: We parse `/proc/loadavg`, which provides the exponential moving average load over 1, 5, and 15 minutes along with the count of currently running threads over total scheduled threads.
 
-### Q5: How is CPU % calculated from `/proc/stat`?
-**A**: We read the `cpu` line from `/proc/stat` which gives cumulative tick counters since boot. We sum idle+iowait as idle time, and user+nice+system+irq+softirq+steal as active time. CPU% = (active / total) × 100.
-
-### Q6: How does the virtual device IOCTL work without a kernel module?
-**A**: We simulate kernel IOCTL semantics in user-space using a `switch` statement in `sendIoctl()`. The `VDEV_IOCTL_START/STOP/RESET` constants (`0x8001–0x8003`) mirror real kernel IOCTL command codes. The `DeviceState` enum tracks device state changes, just like a kernel driver would update internal state.
-
-### Q7: How does the daemon shut down cleanly on Ctrl+C?
-**A**: `signal(SIGINT, signalHandler)` registers a handler that sets `std::atomic<bool> vdev_running = false`. The `std::atomic` type guarantees the write is visible to the main loop thread without data races. When the loop exits, `DeviceManager`'s destructor runs (RAII), calling `close(fd)` and `std::filesystem::remove()` on the FIFO node.
+### Q5: How does the query protocol work over the device node?
+**A**: `DeviceManager::processQueryCommand()` parses command strings (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_JSON`, `GET_HEALTH`, `PING`) and returns targeted key-value strings or JSON data structures without requiring any custom network protocol.
 
 ---
 
@@ -141,13 +135,13 @@ Ctrl+C    (observe "shutting down cleanly" log message)
 
 | Feature | Implementation |
 | :--- | :--- |
-| Virtual device interface | `mkfifo("/tmp/vdevpulse")` with `O_RDWR|O_NONBLOCK` |
-| CPU telemetry | `/proc/stat` tick parser, percentage calculation |
-| RAM telemetry | `/proc/meminfo` `MemTotal`/`MemAvailable` parser |
-| System uptime | `/proc/uptime` float parser |
-| IOCTL commands | `0x8001` start, `0x8002` stop, `0x8003` reset |
+| Virtual device interface | `mkfifo("/tmp/vdevpulse")` with `O_RDWR\|O_NONBLOCK` |
+| Multi-source telemetry | `/proc/stat`, `/proc/meminfo`, `/proc/loadavg`, `/proc/uptime` |
+| Threshold Alert Engine | Policy-based rule evaluation with dynamic health status |
+| Query protocol | `GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_JSON`, `GET_HEALTH`, `PING` |
+| JSON output stream | Compact structured JSON serialization |
+| History ring buffer | In-memory circular buffer preserving recent samples |
+| Extended IOCTL suite | `START`, `STOP`, `RESET`, `GET_STATS`, `SET_RATE` |
 | Thread-safe logger | Singleton + `std::mutex` + ANSI colors + file output |
-| Signal handling | `SIGINT`/`SIGTERM` → `std::atomic<bool>` → RAII cleanup |
-| JSON config | Custom string extractor, graceful fallback to defaults |
-| Automated tests | 2 CTest suites; 100% pass; 9 test case assertions |
-| SDLC documentation | 6 full stage documents with UML diagrams |
+| Automated tests | 2 CTest suites; 100% pass; 14 test assertions |
+| SDLC documentation | Full 6-stage engineering docs and PDF report |

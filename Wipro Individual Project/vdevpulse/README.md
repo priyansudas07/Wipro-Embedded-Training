@@ -5,10 +5,15 @@ VDevPulse is a high-performance C++17 system daemon that bridges Linux POSIX vir
 ## Architecture & Features
 
 - **POSIX Virtual Device Driver Emulation**: Creates and manages FIFO stream channels simulating `/dev/vdevpulse` for non-blocking asynchronous user-space communication.
-- **Kernel Telemetry Parser**: Monitors CPU utilization and RAM consumption in real-time from kernel synthetic filesystems (`/proc/stat`, `/proc/meminfo`).
-- **Policy Engine**: Dynamic JSON rule loader configuring sampling intervals, memory limits, and log destinations.
-- **Thread-Safe Logging**: Synchronized multi-threaded logging system supporting debug, info, warning, and error severity levels.
-- **Unit Testing**: Suite powered by standard C++ test fixtures.
+- **Kernel Telemetry Parser**: Monitors CPU utilization, RAM consumption, and uptime in real-time from kernel synthetic filesystems (`/proc/stat`, `/proc/meminfo`, `/proc/uptime`).
+- **System Load & Process Tracking**: Extracts 1m, 5m, 15m load averages and active/total thread counts from `/proc/loadavg`.
+- **Automated Threshold Alert Engine**: Policy-driven rule evaluation firing alerts and tagging system health state (`HEALTHY`, `WARNING_CPU_OVERLOAD`, `WARNING_MEMORY_PRESSURE`).
+- **Interactive Device Query Protocol**: Supports targeted query commands (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_JSON`, `GET_HEALTH`, `PING`) over device streams.
+- **Structured JSON Streaming**: Export live metrics as compact JSON objects for direct integration with web dashboards or analytics tools.
+- **Historical Ring Buffer**: In-memory circular buffer preserving recent telemetry snapshots.
+- **Extended IOCTL Suite**: Virtual IOCTL commands (`START`, `STOP`, `RESET`, `GET_STATS`, `SET_RATE`) and runtime statistics accounting.
+- **Thread-Safe Logging**: Synchronized multi-threaded logging system supporting debug, info, warning, error, and device severity levels.
+- **Unit Testing**: Suite powered by standard C++ test fixtures with 100% CTest pass rate.
 
 ## System Requirements
 
@@ -40,28 +45,46 @@ Starts the live telemetry monitor and creates the virtual character device at `/
 ```bash
 ./vdevpulse run ../configs/vdev_policy.json
 ```
-*(Press `Ctrl + C` for graceful shutdown)*
+*(Supports `--json` for JSON output format. Press `Ctrl + C` for graceful shutdown)*
 
 ### 2. Read Telemetry Stream (Client Terminal)
 While the daemon is running, open a separate terminal to read live telemetry directly from the virtual device node:
 ```bash
 cat /tmp/vdevpulse
-# Output: TELEMETRY_SAMPLE CPU=14.370000 MEM=7142MB
+# Output: TELEMETRY_SAMPLE HEALTH=HEALTHY CPU=14.37% MEM=7142MB LOAD=0.45
 ```
 
 ### 3. Query Single Telemetry Snapshot
 ```bash
 ./vdevpulse status
+# Or output in JSON format:
+./vdevpulse status --json
 ```
 
-### 4. Send Virtual IOCTL Control Commands
+### 4. Interactive Device Queries
+```bash
+./vdevpulse query GET_CPU      # Output: CPU_PCT=14.37
+./vdevpulse query GET_MEM      # Output: MEM_USED=7142MB (44.7%)
+./vdevpulse query GET_LOAD     # Output: LOAD_AVG=0.45,0.30,0.15
+./vdevpulse query GET_HEALTH   # Output: HEALTH=HEALTHY
+./vdevpulse query GET_JSON     # Outputs formatted JSON snapshot
+./vdevpulse query PING         # Output: PONG
+```
+
+### 5. Inspect Historical Telemetry Buffer
+```bash
+./vdevpulse history
+```
+
+### 6. Send Virtual IOCTL Control Commands
 ```bash
 ./vdevpulse ioctl start    # Set virtual device state to RUNNING
 ./vdevpulse ioctl stop     # Set virtual device state to STOPPED
-./vdevpulse ioctl reset    # Reset virtual device state
+./vdevpulse ioctl reset    # Reset device state and statistics
+./vdevpulse ioctl stats    # Query cumulative I/O statistics
 ```
 
-### 5. Write Payload to Virtual Device
+### 7. Write Payload to Virtual Device
 ```bash
 ./vdevpulse write "PING_DIAGNOSTIC_SIGNAL"
 ```
@@ -71,12 +94,13 @@ cat /tmp/vdevpulse
 | Command | Description |
 | :--- | :--- |
 | `./vdevpulse` | Displays usage and help menu |
-| `./vdevpulse run [policy.json]` | Starts the continuous live daemon loop |
-| `./vdevpulse status` | Displays an instantaneous CPU, RAM, and Uptime snapshot |
-| `./vdevpulse ioctl <start\|stop\|reset>` | Sends an IOCTL state management command |
+| `./vdevpulse run [policy.json] [--json]` | Starts the continuous live daemon loop (text or JSON format) |
+| `./vdevpulse status [--json]` | Displays an instantaneous CPU, RAM, Load, and Health snapshot |
+| `./vdevpulse history` | Displays the circular ring buffer of recent telemetry samples |
+| `./vdevpulse query <CMD>` | Queries targeted metrics (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_JSON`, `GET_HEALTH`, `PING`) |
+| `./vdevpulse ioctl <start\|stop\|reset\|stats>` | Sends an IOCTL state or stats command |
 | `./vdevpulse write <message>` | Writes a custom payload string to the virtual device node |
 | `cat /tmp/vdevpulse` | Reads real-time telemetry stream from the device node |
-
 
 ## Documentation
 

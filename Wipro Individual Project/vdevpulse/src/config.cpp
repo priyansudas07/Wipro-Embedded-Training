@@ -8,7 +8,7 @@ namespace fs = std::filesystem;
 
 bool ConfigParser::loadPolicy(const std::string& filepath, VDevConfig& config) {
     if (!fs::exists(filepath)) {
-        Logger::getInstance().log(LogLevel::WARNING, "Policy configuration file not found: " + filepath + ", using default virtual device configuration.");
+        Logger::getInstance().log(LogLevel::WARNING, "Policy configuration file not found: " + filepath + ", using default configuration.");
         return true;
     }
 
@@ -32,8 +32,35 @@ bool ConfigParser::loadPolicy(const std::string& filepath, VDevConfig& config) {
         return default_val;
     };
 
+    auto extractDouble = [&extractString](const std::string& key, double default_val) -> double {
+        std::string val = extractString(key, "");
+        if (!val.empty()) {
+            try {
+                return std::stod(val);
+            } catch (...) {}
+        }
+        return default_val;
+    };
+
+    auto extractInt = [&extractString](const std::string& key, int default_val) -> int {
+        std::string val = extractString(key, "");
+        if (!val.empty()) {
+            try {
+                return std::stoi(val);
+            } catch (...) {}
+        }
+        return default_val;
+    };
+
     config.device_name = extractString("device_name", config.device_name);
     config.device_path = extractString("device_path", config.device_path);
-    Logger::getInstance().log(LogLevel::INFO, "Loaded Virtual Device Policy: Device=" + config.device_path);
+    config.sampling_rate_ms = extractInt("sampling_rate_ms", config.sampling_rate_ms);
+    config.cpu_alert_threshold_pct = extractDouble("cpu_alert_threshold_pct", config.cpu_alert_threshold_pct);
+    config.memory_alert_threshold_pct = extractDouble("memory_alert_threshold_pct", config.memory_alert_threshold_pct);
+    config.output_format = extractString("output_format", config.output_format);
+
+    Logger::getInstance().log(LogLevel::INFO, "Loaded Virtual Device Policy: Device=" + config.device_path +
+                              ", CPU Threshold=" + std::to_string(config.cpu_alert_threshold_pct) + "%" +
+                              ", RAM Threshold=" + std::to_string(config.memory_alert_threshold_pct) + "%");
     return true;
 }

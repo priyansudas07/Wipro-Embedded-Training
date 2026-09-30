@@ -6,10 +6,13 @@
 #include <iomanip>
 #include <unistd.h>
 #include <filesystem>
+#include <numeric>
 
 namespace fs = std::filesystem;
 
-SystemTelemetry TelemetryMonitor::collectTelemetry() {
+std::deque<SystemTelemetry> TelemetryMonitor::history_buffer_;
+
+SystemTelemetry TelemetryMonitor::collectTelemetry(const VDevConfig& config) {
     SystemTelemetry t;
 
     // 1. Read RAM memory from /proc/meminfo
@@ -60,6 +63,39 @@ SystemTelemetry TelemetryMonitor::collectTelemetry() {
         t.uptime_seconds = static_cast<long>(uptime_sec);
     }
 
+    // 4. Read System Load Averages & Process Counts from /proc/loadavg
+    std::ifstream proc_loadavg("/proc/loadavg");
+    if (proc_loadavg.is_open()) {
+        std::string proc_counts;
+        proc_loadavg >> t.load_1m >> t.load_5m >> t.load_15m >> proc_counts;
+        size_t slash_pos = proc_counts.find('/');
+        if (slash_pos != std::string::npos) {
+            try {
+                t.running_processes = std::stoi(proc_counts.substr(0, slash_pos));
+                t.total_processes = std::stoi(proc_counts.substr(slash_pos + 1));
+            } catch (...) {}
+        }
+    }
+
+    // 5. Automated Health & Threshold Rule Evaluation
+    t.health_status = "HEALTHY";
+    if (t.cpu_usage_pct > config.cpu_alert_threshold_pct) {
+        t.health_status = "WARNING_CPU_OVERLOAD";
+        Logger::getInstance().log(LogLevel::WARNING, "[THRESHOLD ALERT] CPU usage at " +
+                                  std::to_string(t.cpu_usage_pct) + "% (Threshold: " +
+                                  std::to_string(config.cpu_alert_threshold_pct) + "%)");
+    }
+    if (t.memory_usage_pct > config.memory_alert_threshold_pct) {
+        if (t.health_status == "HEALTHY") {
+            t.health_status = "WARNING_MEMORY_PRESSURE";
+        } else {
+            t.health_status = "CRITICAL_RESOURCE_PRESSURE";
+        }
+        Logger::getInstance().log(LogLevel::WARNING, "[THRESHOLD ALERT] RAM usage at " +
+                                  std::to_string(t.memory_usage_pct) + "% (Threshold: " +
+                                  std::to_string(config.memory_alert_threshold_pct) + "%)");
+    }
+
     return t;
 }
 
@@ -67,9 +103,71 @@ void TelemetryMonitor::printTelemetryDashboard(const SystemTelemetry& metrics) {
     std::cout << "======================================================" << std::endl;
     std::cout << "        VDEVPULSE SYSTEM TELEMETRY DASHBOARD          " << std::endl;
     std::cout << "======================================================" << std::endl;
+    std::cout << "  System Health    : " << metrics.health_status << std::endl;
     std::cout << "  CPU Usage        : " << std::fixed << std::setprecision(2) << metrics.cpu_usage_pct << " %" << std::endl;
     std::cout << "  RAM Memory Usage : " << metrics.memory_used_mb << " MB / " << metrics.memory_total_mb << " MB ("
               << std::setprecision(1) << metrics.memory_usage_pct << " %)" << std::endl;
+    std::cout << "  Load Averages    : " << std::setprecision(2) << metrics.load_1m << " (1m), "
+              << metrics.load_5m << " (5m), " << metrics.load_15m << " (15m)" << std::endl;
+    std::cout << "  Active Processes : " << metrics.running_processes << " running / " << metrics.total_processes << " total" << std::endl;
     std::cout << "  System Uptime    : " << metrics.uptime_seconds << " seconds" << std::endl;
+    std::cout << "------------------------------------------------------" << std::endl;
+}
+
+std::string TelemetryMonitor::toJsonString(const SystemTelemetry& metrics) {
+    std::stringstream ss;
+    ss << "{\n";
+    ss << "  \"health_status\": \"" << metrics.health_status << "\",\n";
+    ss << "  \"cpu_usage_pct\": " << std::fixed << std::setprecision(2) << metrics.cpu_usage_pct << ",\n";
+    ss << "  \"memory_used_mb\": " << metrics.memory_used_mb << ",\n";
+    ss << "  \"memory_total_mb\": " << metrics.memory_total_mb << ",\n";
+    ss << "  \"memory_usage_pct\": " << std::fixed << std::setprecision(2) << metrics.memory_usage_pct << ",\n";
+    ss << "  \"load_1m\": " << std::fixed << std::setprecision(2) << metrics.load_1m << ",\n";
+    ss << "  \"load_5m\": " << std::fixed << std::setprecision(2) << metrics.load_5m << ",\n";
+    ss << "  \"load_15m\": " << std::fixed << std::setprecision(2) << metrics.load_15m << ",\n";
+    ss << "  \"running_processes\": " << metrics.running_processes << ",\n";
+    ss << "  \"total_processes\": " << metrics.total_processes << ",\n";
+    ss << "  \"uptime_seconds\": " << metrics.uptime_seconds << "\n";
+    ss << "}";
+    return ss.str();
+}
+
+void TelemetryMonitor::recordHistory(const SystemTelemetry& metrics) {
+    if (history_buffer_.size() >= MAX_HISTORY_SAMPLES) {
+        history_buffer_.pop_front();
+    }
+    history_buffer_.push_back(metrics);
+}
+
+const std::deque<SystemTelemetry>& TelemetryMonitor::getHistory() {
+    return history_buffer_;
+}
+
+void TelemetryMonitor::printHistory() {
+    std::cout << "======================================================" << std::endl;
+    std::cout << "      VDEVPULSE HISTORICAL TELEMETRY BUFFER           " << std::endl;
+    std::cout << "======================================================" << std::endl;
+    if (history_buffer_.empty()) {
+        std::cout << "  No historical records accumulated yet." << std::endl;
+        std::cout << "------------------------------------------------------" << std::endl;
+        return;
+    }
+
+    std::cout << std::left << std::setw(8) << "Sample"
+              << std::setw(12) << "CPU (%)"
+              << std::setw(16) << "RAM (MB/%)"
+              << std::setw(12) << "Load (1m)"
+              << std::setw(12) << "Health" << std::endl;
+    std::cout << "------------------------------------------------------" << std::endl;
+
+    int idx = 1;
+    for (const auto& h : history_buffer_) {
+        std::string ram_str = std::to_string(h.memory_used_mb) + "M/" + std::to_string(static_cast<int>(h.memory_usage_pct)) + "%";
+        std::cout << std::left << std::setw(8) << idx++
+                  << std::setw(12) << std::fixed << std::setprecision(1) << h.cpu_usage_pct
+                  << std::setw(16) << ram_str
+                  << std::setw(12) << std::setprecision(2) << h.load_1m
+                  << std::setw(12) << h.health_status << std::endl;
+    }
     std::cout << "------------------------------------------------------" << std::endl;
 }

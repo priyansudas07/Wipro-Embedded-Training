@@ -4,5 +4,8 @@
   "sampling_rate_ms": 1000,
   "enable_cpu_telemetry": true,
   "enable_memory_telemetry": true,
-  "max_memory_threshold_mb": 4096
+  "cpu_alert_threshold_pct": 85.0,
+  "memory_alert_threshold_pct": 90.0,
+  "max_memory_threshold_mb": 4096,
+  "output_format": "text"
 }
