@@ -129,7 +129,8 @@ cat /tmp/vdevpulse
 
 ## Documentation
 
-- [Project Report (PDF)](docs/VDevPulse_Project_Documentation.pdf)
+- [Project Report - Complete Technical Defense (PDF - 6 Pages)](docs/VDevPulse_Project_Documentation.pdf)
+- [Simple Documentation - Executive Summary (PDF - 3 Pages)](docs/VDevPulse_Simple_Documentation.pdf)
 
 Full SDLC documentation and architecture diagrams are also available across the discrete stage files:
 
