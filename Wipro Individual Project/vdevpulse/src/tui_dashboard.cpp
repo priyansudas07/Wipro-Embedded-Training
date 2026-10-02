@@ -29,6 +29,56 @@ namespace {
     const std::string ANSI_MAGENTA = "\033[35m";
     const std::string ANSI_WHITE   = "\033[37m";
 
+    // Repeat a UTF-8 character string safely
+    std::string repeatUtf8(const std::string& pattern, int count) {
+        std::string result;
+        if (count <= 0) return result;
+        result.reserve(pattern.length() * count);
+        for (int i = 0; i < count; ++i) {
+            result += pattern;
+        }
+        return result;
+    }
+
+    // Calculate visual terminal column width of a string (ignoring ANSI codes & handling UTF-8 characters)
+    int visibleWidth(const std::string& str) {
+        int width = 0;
+        bool in_ansi = false;
+        for (size_t i = 0; i < str.length(); ++i) {
+            if (str[i] == '\033') {
+                in_ansi = true;
+            } else if (in_ansi) {
+                if (str[i] == 'm') in_ansi = false;
+            } else {
+                unsigned char c = static_cast<unsigned char>(str[i]);
+                // UTF-8 continuation bytes (0x80 to 0xBF) do not advance visual column width
+                if ((c & 0xC0) != 0x80) {
+                    width++;
+                }
+            }
+        }
+        return width;
+    }
+
+    // Pad string to exact visual terminal column width
+    std::string padToWidth(const std::string& content, int target_width) {
+        int vis = visibleWidth(content);
+        if (vis < target_width) {
+            return content + std::string(target_width - vis, ' ');
+        }
+        return content;
+    }
+
+    // Generate box header with exact 80 visual columns
+    std::string makeBoxHeader(const std::string& title, const std::string& color_ansi = ANSI_CYAN) {
+        int title_vis = visibleWidth(title);
+        // Header format: "┌── [ " + title + " ] " + repeat("─", remaining) + "┐"
+        // Total columns = 1 (┌) + 2 (──) + 3 ( [ ) + title_vis + 3 ( ] ) + rem + 1 (┐) = 10 + title_vis + rem = 80
+        int rem = 80 - 10 - title_vis;
+        if (rem < 1) rem = 1;
+        return ANSI_BOLD + color_ansi + "┌── [ " + title + " ] " + repeatUtf8("─", rem) + "┐\n" + ANSI_RESET;
+    }
+
     class TerminalMode {
     public:
         static void setRawMode() {
@@ -88,27 +138,28 @@ void TuiDashboard::clearScreen() {
 
 void TuiDashboard::renderHeader(const VDevConfig& config) {
     std::cout << ANSI_BOLD << ANSI_CYAN
-              << "================================================================================\n"
-              << "     VDevPulse v1.0 -- Linux Virtual Device & System Telemetry Center          \n"
-              << "================================================================================\n"
+              << "╔══════════════════════════════════════════════════════════════════════════════╗\n"
+              << "║     VDevPulse v1.0 -- Linux Virtual Device & System Telemetry Center         ║\n"
+              << "╚══════════════════════════════════════════════════════════════════════════════╝\n"
               << ANSI_RESET;
     
-    // Subtitle Bar (exact 80 columns: "  " + 76 content + "  ")
+    // Subtitle Bar
     std::ostringstream pbar;
     pbar << "Node: " << config.device_path 
-         << " | CPU Alert: " << std::fixed << std::setprecision(0) << config.cpu_alert_threshold_pct << "%"
-         << " | RAM Alert: " << config.memory_alert_threshold_pct << "%"
-         << " | Rate: " << config.sampling_rate_ms << "ms";
-    std::string pstr = pbar.str();
-    if (pstr.length() < 76) {
-        pstr.append(76 - pstr.length(), ' ');
-    } else if (pstr.length() > 76) {
-        pstr = pstr.substr(0, 76);
-    }
-    std::cout << ANSI_DIM << ANSI_WHITE << "  " << pstr << "  " << ANSI_RESET << "\n";
+         << " │ CPU Alert: " << std::fixed << std::setprecision(0) << config.cpu_alert_threshold_pct << "%"
+         << " │ RAM Alert: " << config.memory_alert_threshold_pct << "%"
+         << " │ Rate: " << config.sampling_rate_ms << "ms";
+    
+    std::cout << ANSI_DIM << ANSI_WHITE << "  " << padToWidth(pbar.str(), 76) << "  " << ANSI_RESET << "\n";
 }
 
 void TuiDashboard::renderProgressBar(const std::string& label, double pct, int width) {
+    (void)label;
+    (void)pct;
+    (void)width;
+}
+
+static std::string makeProgressBar(const std::string& label, double pct, int width = 20) {
     if (pct < 0.0) pct = 0.0;
     if (pct > 100.0) pct = 100.0;
 
@@ -117,78 +168,65 @@ void TuiDashboard::renderProgressBar(const std::string& label, double pct, int w
     if (pct >= 85.0) color = ANSI_RED;
     else if (pct >= 65.0) color = ANSI_YELLOW;
 
-    std::cout << std::left << std::setw(11) << label << "[";
-    std::cout << color << ANSI_BOLD;
+    std::ostringstream ss;
+    ss << std::left << std::setw(11) << label << "[";
+    ss << color << ANSI_BOLD;
     for (int i = 0; i < width; ++i) {
-        if (i < filled) std::cout << "=";
-        else std::cout << "-";
+        if (i < filled) ss << "█";
+        else ss << "░";
     }
-    std::cout << ANSI_RESET << "] " << std::right << std::setw(5) << std::fixed << std::setprecision(1) << pct << "%";
+    ss << ANSI_RESET << "] " << std::right << std::setw(5) << std::fixed << std::setprecision(1) << pct << "%";
+    return ss.str();
 }
 
 void TuiDashboard::renderLiveTelemetryPanel(const SystemTelemetry& t, const DeviceManager& dev, const VDevConfig& config) {
     (void)config;
     std::string health_badge = ANSI_GREEN + ANSI_BOLD + "● [ HEALTHY ]" + ANSI_RESET;
-    std::string health_raw = "[ HEALTHY ]";
     if (t.health_status.find("CRITICAL") != std::string::npos) {
         health_badge = ANSI_RED + ANSI_BOLD + "✖ [ CRITICAL ]" + ANSI_RESET;
-        health_raw = "[ CRITICAL ]";
     } else if (t.health_status.find("WARNING") != std::string::npos) {
         health_badge = ANSI_YELLOW + ANSI_BOLD + "▲ [ WARNING ]" + ANSI_RESET;
-        health_raw = "[ WARNING ]";
     }
 
-    // 1. LIVE HARDWARE TELEMETRY BOX (80 width: + + 78 chars + +)
-    std::cout << ANSI_BOLD << ANSI_CYAN
-              << "+-- [ LIVE HARDWARE & SYSTEM TELEMETRY (AUTO-REFRESHING) ] -------------------+\n"
-              << ANSI_RESET;
+    // 1. LIVE HARDWARE TELEMETRY BOX
+    std::cout << makeBoxHeader("LIVE HARDWARE & SYSTEM TELEMETRY (AUTO-REFRESHING)", ANSI_CYAN);
     
-    // Line 1: Health & Uptime (76 chars inner)
+    // Row 1: Health & Uptime
     long hrs = t.uptime_seconds / 3600;
     long mins = (t.uptime_seconds % 3600) / 60;
     long secs = t.uptime_seconds % 60;
-    std::ostringstream uptime_ss;
-    uptime_ss << "System Uptime : " << hrs << "h " << mins << "m " << secs << "s (" << t.uptime_seconds << "s)";
-    std::string uptime_str = uptime_ss.str();
-
-    std::cout << "| System Health : " << health_badge;
-    int spaces_l1 = 76 - (18 + (int)health_raw.length()) - (int)uptime_str.length();
-    if (spaces_l1 < 1) spaces_l1 = 1;
-    std::cout << std::string(spaces_l1, ' ') << uptime_str << " |\n";
-
-    // Line 2: CPU Bar & Load Averages
-    std::ostringstream load_ss;
-    load_ss << "Load (1/5/15) : " << std::fixed << std::setprecision(2)
-            << t.load_1m << ", " << t.load_5m << ", " << t.load_15m;
-    std::string load_str = load_ss.str();
+    std::ostringstream r1_right;
+    r1_right << "System Uptime : " << hrs << "h " << mins << "m " << secs << "s (" << t.uptime_seconds << "s)";
     
-    std::cout << "| ";
-    renderProgressBar("CPU Usage", t.cpu_usage_pct, 20); // 40 chars
-    int spaces_l2 = 76 - 40 - (int)load_str.length();
-    if (spaces_l2 < 1) spaces_l2 = 1;
-    std::cout << std::string(spaces_l2, ' ') << load_str << " |\n";
+    std::string r1_left = "System Health : " + health_badge;
+    int r1_pad = 76 - visibleWidth(r1_left) - visibleWidth(r1_right.str());
+    std::string row1 = r1_left + (r1_pad > 0 ? std::string(r1_pad, ' ') : " ") + r1_right.str();
+    std::cout << "│ " << padToWidth(row1, 76) << " │\n";
 
-    // Line 3: RAM Bar & Active Tasks
-    std::ostringstream proc_ss;
-    proc_ss << "Active Tasks  : " << t.running_processes << " run / " << t.total_processes << " total";
-    std::string proc_str = proc_ss.str();
+    // Row 2: CPU Bar & Load Averages
+    std::string cpu_bar = makeProgressBar("CPU Usage", t.cpu_usage_pct, 20);
+    std::ostringstream r2_right;
+    r2_right << "Load (1/5/15) : " << std::fixed << std::setprecision(2)
+             << t.load_1m << ", " << t.load_5m << ", " << t.load_15m;
+    int r2_pad = 76 - visibleWidth(cpu_bar) - visibleWidth(r2_right.str());
+    std::string row2 = cpu_bar + (r2_pad > 0 ? std::string(r2_pad, ' ') : " ") + r2_right.str();
+    std::cout << "│ " << padToWidth(row2, 76) << " │\n";
 
-    std::cout << "| ";
-    renderProgressBar("RAM Memory", t.memory_usage_pct, 20); // 40 chars
-    int spaces_l3 = 76 - 40 - (int)proc_str.length();
-    if (spaces_l3 < 1) spaces_l3 = 1;
-    std::cout << std::string(spaces_l3, ' ') << proc_str << " |\n";
+    // Row 3: RAM Bar & Active Tasks
+    std::string ram_bar = makeProgressBar("RAM Memory", t.memory_usage_pct, 20);
+    std::ostringstream r3_right;
+    r3_right << "Active Tasks  : " << t.running_processes << " run / " << t.total_processes << " total";
+    int r3_pad = 76 - visibleWidth(ram_bar) - visibleWidth(r3_right.str());
+    std::string row3 = ram_bar + (r3_pad > 0 ? std::string(r3_pad, ' ') : " ") + r3_right.str();
+    std::cout << "│ " << padToWidth(row3, 76) << " │\n";
 
-    // Line 4: RAM Detail
-    std::ostringstream ram_ss;
-    ram_ss << "RAM Allocation: " << t.memory_used_mb << " MB used / " << t.memory_total_mb << " MB total";
-    std::string ram_str = ram_ss.str();
-    int spaces_l4 = 76 - (int)ram_str.length();
-    if (spaces_l4 < 1) spaces_l4 = 1;
-    std::cout << "| " << ram_str << std::string(spaces_l4, ' ') << "|\n";
+    // Row 4: RAM Detail
+    std::ostringstream r4;
+    r4 << "RAM Allocation: " << t.memory_used_mb << " MB used / " << t.memory_total_mb << " MB total";
+    std::cout << "│ " << padToWidth(r4.str(), 76) << " │\n";
 
     std::cout << ANSI_BOLD << ANSI_CYAN
-              << "+------------------------------------------------------------------------------+\n"
+              << "└" << repeatUtf8("─", 78) << "┘\n"
               << ANSI_RESET;
 
     // 2. LIVE VIRTUAL DEVICE DRIVER TELEMETRY BOX
@@ -197,54 +235,57 @@ void TuiDashboard::renderLiveTelemetryPanel(const SystemTelemetry& t, const Devi
                                 (dev.getState() == DeviceState::PAUSED)  ? "PAUSED (Standby)" : "STOPPED (Halted)";
     std::string dev_color = (dev.getState() == DeviceState::RUNNING) ? ANSI_GREEN : ANSI_YELLOW;
 
-    std::cout << ANSI_BOLD << ANSI_BLUE
-              << "+-- [ LIVE VIRTUAL DEVICE TELEMETRY (/tmp/vdevpulse) ] ------------------------+\n"
-              << ANSI_RESET;
+    std::cout << makeBoxHeader("LIVE VIRTUAL DEVICE TELEMETRY (/tmp/vdevpulse)", ANSI_BLUE);
 
-    std::ostringstream b_ss;
-    b_ss << "Bytes Processed : " << stats.total_bytes_written << " Bytes";
-    std::string b_str = b_ss.str();
+    std::string d1_left = "Driver State  : " + dev_color + ANSI_BOLD + dev_state_str + ANSI_RESET;
+    std::ostringstream d1_right;
+    d1_right << "Bytes Processed : " << stats.total_bytes_written << " Bytes";
+    int d1_pad = 76 - visibleWidth(d1_left) - visibleWidth(d1_right.str());
+    std::string dev_row1 = d1_left + (d1_pad > 0 ? std::string(d1_pad, ' ') : " ") + d1_right.str();
+    std::cout << "│ " << padToWidth(dev_row1, 76) << " │\n";
 
-    std::cout << "| Driver State  : " << dev_color << ANSI_BOLD << dev_state_str << ANSI_RESET;
-    int spaces_d1 = 76 - (16 + (int)dev_state_str.length()) - (int)b_str.length();
-    if (spaces_d1 < 1) spaces_d1 = 1;
-    std::cout << std::string(spaces_d1, ' ') << b_str << " |\n";
-
-    std::ostringstream io_ss;
-    io_ss << "Driver I/O Ops : " << stats.total_reads << " reads, " << stats.total_queries << " queries";
-    std::string io_str = io_ss.str();
-
-    std::ostringstream ioctl_ss;
-    ioctl_ss << "IOCTL Operations: " << stats.total_ioctls << " calls";
-    std::string ioctl_str = ioctl_ss.str();
-
-    int spaces_d2 = 76 - (int)io_str.length() - (int)ioctl_str.length();
-    if (spaces_d2 < 1) spaces_d2 = 1;
-    std::cout << "| " << io_str << std::string(spaces_d2, ' ') << ioctl_str << " |\n";
+    std::ostringstream d2_left;
+    d2_left << "Driver I/O Ops : " << stats.total_reads << " reads, " << stats.total_queries << " queries";
+    std::ostringstream d2_right;
+    d2_right << "IOCTL Operations: " << stats.total_ioctls << " calls";
+    int d2_pad = 76 - visibleWidth(d2_left.str()) - visibleWidth(d2_right.str());
+    std::string dev_row2 = d2_left.str() + (d2_pad > 0 ? std::string(d2_pad, ' ') : " ") + d2_right.str();
+    std::cout << "│ " << padToWidth(dev_row2, 76) << " │\n";
 
     std::cout << ANSI_BOLD << ANSI_BLUE
-              << "+------------------------------------------------------------------------------+\n"
+              << "└" << repeatUtf8("─", 78) << "┘\n"
               << ANSI_RESET;
 }
 
 void TuiDashboard::renderActionControlsMenu() {
+    std::cout << makeBoxHeader("ACTION CONTROLS & DIAGNOSTICS (PRESS HOTKEY INSTANTLY)", ANSI_MAGENTA);
+
+    auto printMenuRow = [](const std::string& col1, const std::string& col2) {
+        std::string c1_padded = padToWidth(col1, 36);
+        std::string c2_padded = padToWidth(col2, 37);
+        std::cout << "│ " << c1_padded << " │ " << c2_padded << " │\n";
+    };
+
+    printMenuRow(ANSI_YELLOW + ANSI_BOLD + "[1]" + ANSI_RESET + " Scan Top Heavy Processes",
+                 ANSI_YELLOW + ANSI_BOLD + "[2]" + ANSI_RESET + " Device IOCTL Command Control");
+
+    printMenuRow(ANSI_YELLOW + ANSI_BOLD + "[3]" + ANSI_RESET + " Synchronous Query Protocol (M2M)",
+                 ANSI_YELLOW + ANSI_BOLD + "[4]" + ANSI_RESET + " Write Custom Payload to Device");
+
+    printMenuRow(ANSI_YELLOW + ANSI_BOLD + "[5]" + ANSI_RESET + " History Buffer & Sparklines",
+                 ANSI_YELLOW + ANSI_BOLD + "[6]" + ANSI_RESET + " Cycle Refresh Rate (500-2000ms)");
+
+    printMenuRow(ANSI_YELLOW + ANSI_BOLD + "[7]" + ANSI_RESET + " Structured JSON Telemetry Export",
+                 ANSI_YELLOW + ANSI_BOLD + "[8]" + ANSI_RESET + " View Policy Configuration");
+
+    printMenuRow(ANSI_CYAN   + ANSI_BOLD + "[T]" + ANSI_RESET + " Inject Traffic Burst (10 Pkts)",
+                 ANSI_CYAN   + ANSI_BOLD + "[S]" + ANSI_RESET + " Toggle Driver State (RUN/PAUSE)");
+
+    printMenuRow(ANSI_GREEN  + ANSI_BOLD + "[+]" + ANSI_RESET + "/" + ANSI_GREEN + ANSI_BOLD + "[-]" + ANSI_RESET + " Adjust CPU Alert Threshold",
+                 ANSI_RED    + ANSI_BOLD + "[Q]" + ANSI_RESET + " Exit Control Center to Shell");
+
     std::cout << ANSI_BOLD << ANSI_MAGENTA
-              << "+-- [ ACTION CONTROLS & DIAGNOSTICS (PRESS HOTKEY INSTANTLY) ] ----------------+\n"
-              << ANSI_RESET
-              << "| " << ANSI_YELLOW << ANSI_BOLD << "[1]" << ANSI_RESET << " Scan Top Heavy Processes          | "
-              << ANSI_YELLOW << ANSI_BOLD << "[2]" << ANSI_RESET << " Device IOCTL Command Control       |\n"
-              << "| " << ANSI_YELLOW << ANSI_BOLD << "[3]" << ANSI_RESET << " Synchronous Query Protocol (M2M)  | "
-              << ANSI_YELLOW << ANSI_BOLD << "[4]" << ANSI_RESET << " Write Custom Payload to Device     |\n"
-              << "| " << ANSI_YELLOW << ANSI_BOLD << "[5]" << ANSI_RESET << " History Buffer & Sparkline Graph  | "
-              << ANSI_YELLOW << ANSI_BOLD << "[6]" << ANSI_RESET << " Cycle Refresh Rate (500-2000ms)    |\n"
-              << "| " << ANSI_YELLOW << ANSI_BOLD << "[7]" << ANSI_RESET << " Structured JSON Telemetry Export   | "
-              << ANSI_YELLOW << ANSI_BOLD << "[8]" << ANSI_RESET << " View Policy Configuration Matrix   |\n"
-              << "| " << ANSI_CYAN   << ANSI_BOLD << "[T]" << ANSI_RESET << " Inject I/O Traffic Burst (10 Pkts)| "
-              << ANSI_CYAN   << ANSI_BOLD << "[S]" << ANSI_RESET << " Toggle Driver State (RUN/PAUSE)    |\n"
-              << "| " << ANSI_GREEN  << ANSI_BOLD << "[+]" << ANSI_RESET << "/" << ANSI_GREEN << ANSI_BOLD << "[-]" << ANSI_RESET << " Adjust CPU Alert Threshold   | "
-              << ANSI_RED    << ANSI_BOLD << "[Q]" << ANSI_RESET << " Exit Control Center to Shell       |\n"
-              << ANSI_BOLD << ANSI_MAGENTA
-              << "+------------------------------------------------------------------------------+\n"
+              << "└" << repeatUtf8("─", 78) << "┘\n"
               << ANSI_RESET;
     std::cout << ANSI_BOLD << ANSI_GREEN << "● [LIVE RUNNING]" << ANSI_RESET 
               << ANSI_BOLD << " Hotkeys [1-8, T, S, +, -, Q] (No Enter required): " << ANSI_RESET << std::flush;
@@ -253,9 +294,9 @@ void TuiDashboard::renderActionControlsMenu() {
 void TuiDashboard::showTopProcessesMenu() {
     clearScreen();
     std::cout << ANSI_BOLD << ANSI_CYAN
-              << "================================================================================\n"
+              << "════════════════════════════════════════════════════════════════════════════════\n"
               << "               DIAGNOSTICS: TOP RESOURCE-CONSUMING PROCESSES                    \n"
-              << "================================================================================\n"
+              << "════════════════════════════════════════════════════════════════════════════════\n"
               << ANSI_RESET;
     
     auto topList = TelemetryMonitor::getTopProcesses(10);
@@ -265,7 +306,7 @@ void TuiDashboard::showTopProcessesMenu() {
               << std::setw(32) << "PROCESS NAME"
               << std::setw(16) << "PHYSICAL RAM (MB)"
               << "STATUS" << "\n" << ANSI_RESET;
-    std::cout << "  " << std::string(74, '-') << "\n";
+    std::cout << "  " << repeatUtf8("─", 74) << "\n";
     
     for (const auto& p : topList) {
         std::cout << "  " << std::left << std::setw(8) << p.pid
@@ -281,9 +322,9 @@ void TuiDashboard::showTopProcessesMenu() {
 void TuiDashboard::showQueryMenu() {
     clearScreen();
     std::cout << ANSI_BOLD << ANSI_CYAN
-              << "================================================================================\n"
+              << "════════════════════════════════════════════════════════════════════════════════\n"
               << "          MACHINE-TO-MACHINE (M2M) SYNCHRONOUS QUERY PROTOCOL                   \n"
-              << "================================================================================\n"
+              << "════════════════════════════════════════════════════════════════════════════════\n"
               << ANSI_RESET;
     std::cout << "Select a protocol query opcode to dispatch to the virtual character driver:\n\n";
     std::cout << "  [1] GET_CPU    - Query instantaneous CPU usage percentage\n";
@@ -335,9 +376,9 @@ void TuiDashboard::showQueryMenu() {
 void TuiDashboard::showIoctlMenu(DeviceManager& dev) {
     clearScreen();
     std::cout << ANSI_BOLD << ANSI_MAGENTA
-              << "================================================================================\n"
+              << "════════════════════════════════════════════════════════════════════════════════\n"
               << "               VIRTUAL CHARACTER DRIVER IOCTL CONTROL PANEL                     \n"
-              << "================================================================================\n"
+              << "════════════════════════════════════════════════════════════════════════════════\n"
               << ANSI_RESET;
     std::cout << "Available IOCTL Operations:\n\n";
     std::cout << "  [1] START     (IOCTL 0x8001: Transition driver state to RUNNING)\n";
@@ -388,36 +429,36 @@ void TuiDashboard::showIoctlMenu(DeviceManager& dev) {
 void TuiDashboard::showHistoryMenu() {
     clearScreen();
     std::cout << ANSI_BOLD << ANSI_CYAN
-              << "================================================================================\n"
+              << "════════════════════════════════════════════════════════════════════════════════\n"
               << "         HISTORICAL TELEMETRY BUFFER & METRIC LOGS (LAST 60 SAMPLES)            \n"
-              << "================================================================================\n"
+              << "════════════════════════════════════════════════════════════════════════════════\n"
               << ANSI_RESET;
 
     const auto& hist = TelemetryMonitor::getHistory();
 
-    // Render ASCII Sparklines for CPU and RAM trends
-    std::cout << ANSI_BOLD << ANSI_YELLOW << "\n--- TELEMETRY TREND SPARKLINES (CHRONOLOGICAL) ---\n" << ANSI_RESET;
+    // Render Sparklines
+    std::cout << ANSI_BOLD << ANSI_YELLOW << "\n─── TELEMETRY TREND SPARKLINES (CHRONOLOGICAL) ───\n" << ANSI_RESET;
     std::cout << "CPU Trajectory : [";
     for (const auto& sample : hist) {
         double p = sample.cpu_usage_pct;
-        if (p < 10.0) std::cout << ANSI_GREEN << "_" << ANSI_RESET;
-        else if (p < 30.0) std::cout << ANSI_GREEN << "." << ANSI_RESET;
-        else if (p < 60.0) std::cout << ANSI_YELLOW << "=" << ANSI_RESET;
-        else if (p < 85.0) std::cout << ANSI_YELLOW << "+" << ANSI_RESET;
-        else std::cout << ANSI_RED << "#" << ANSI_RESET;
+        if (p < 10.0) std::cout << ANSI_GREEN << " " << ANSI_RESET;
+        else if (p < 30.0) std::cout << ANSI_GREEN << "▂" << ANSI_RESET;
+        else if (p < 60.0) std::cout << ANSI_YELLOW << "▄" << ANSI_RESET;
+        else if (p < 85.0) std::cout << ANSI_YELLOW << "▆" << ANSI_RESET;
+        else std::cout << ANSI_RED << "█" << ANSI_RESET;
     }
     std::cout << "]\n";
 
     std::cout << "RAM Trajectory : [";
     for (const auto& sample : hist) {
         double p = sample.memory_usage_pct;
-        if (p < 20.0) std::cout << ANSI_GREEN << "." << ANSI_RESET;
-        else if (p < 50.0) std::cout << ANSI_GREEN << "=" << ANSI_RESET;
-        else if (p < 80.0) std::cout << ANSI_YELLOW << "+" << ANSI_RESET;
-        else std::cout << ANSI_RED << "#" << ANSI_RESET;
+        if (p < 20.0) std::cout << ANSI_GREEN << "▂" << ANSI_RESET;
+        else if (p < 50.0) std::cout << ANSI_GREEN << "▄" << ANSI_RESET;
+        else if (p < 80.0) std::cout << ANSI_YELLOW << "▆" << ANSI_RESET;
+        else std::cout << ANSI_RED << "█" << ANSI_RESET;
     }
     std::cout << "]\n";
-    std::cout << "Legend: _=Idle(0-10%)  .=Low(10-30%)  ==Med(30-60%)  +=High(60-85%)  #=Alert(>85%)\n\n";
+    std::cout << "Legend:  =Idle(0-10%)  ▂=Low(10-30%)  ▄=Med(30-60%)  ▆=High(60-85%)  █=Alert(>85%)\n\n";
 
     TelemetryMonitor::printHistory();
     std::cout << "\nPress Enter to return to live dashboard...";
@@ -428,9 +469,9 @@ void TuiDashboard::showHistoryMenu() {
 void TuiDashboard::showWritePayloadPrompt(DeviceManager& dev) {
     clearScreen();
     std::cout << ANSI_BOLD << ANSI_BLUE
-              << "================================================================================\n"
+              << "════════════════════════════════════════════════════════════════════════════════\n"
               << "            WRITE CUSTOM PAYLOAD TO VIRTUAL DEVICE NODE                         \n"
-              << "================================================================================\n"
+              << "════════════════════════════════════════════════════════════════════════════════\n"
               << ANSI_RESET;
     std::cout << "Target Node: " << dev.getDevicePath() << "\n\n";
     std::cout << "Enter payload message to write: ";
@@ -455,9 +496,9 @@ void TuiDashboard::showWritePayloadPrompt(DeviceManager& dev) {
 void TuiDashboard::showPolicyConfigMenu(const VDevConfig& config) {
     clearScreen();
     std::cout << ANSI_BOLD << ANSI_CYAN
-              << "================================================================================\n"
+              << "════════════════════════════════════════════════════════════════════════════════\n"
               << "                  VIRTUAL DEVICE POLICY CONFIGURATION                           \n"
-              << "================================================================================\n"
+              << "════════════════════════════════════════════════════════════════════════════════\n"
               << ANSI_RESET;
     std::cout << "Active Policy Parameters:\n\n";
     std::cout << "  Device Node Path         : " << config.device_path << "\n";
@@ -568,9 +609,9 @@ void TuiDashboard::runInteractiveLoop(const VDevConfig& config) {
         } else if (key == '7') {
             clearScreen();
             std::cout << ANSI_BOLD << ANSI_CYAN
-                      << "================================================================================\n"
+                      << "════════════════════════════════════════════════════════════════════════════════\n"
                       << "                   STRUCTURED JSON TELEMETRY PAYLOAD                            \n"
-                      << "================================================================================\n"
+                      << "════════════════════════════════════════════════════════════════════════════════\n"
                       << ANSI_RESET;
             std::cout << TelemetryMonitor::toJsonString(currentTelemetry) << "\n";
             std::cout << "\nPress Enter to return to live dashboard...";
