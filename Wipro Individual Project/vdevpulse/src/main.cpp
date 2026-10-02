@@ -17,19 +17,20 @@ void signalHandler(int signum) {
 }
 
 void printUsage() {
-    std::cout << "======================================================\n";
-    std::cout << "  VDevPulse — Virtual Device & Telemetry Monitor      \n";
-    std::cout << "======================================================\n";
+    std::cout << "================================================================================\n";
+    std::cout << "  VDevPulse v1.0 — Linux Virtual Device Interface & System Telemetry Center     \n";
+    std::cout << "================================================================================\n";
     std::cout << "Usage:\n";
-    std::cout << "  vdevpulse menu                       Open interactive visual TUI control center\n";
-    std::cout << "  vdevpulse run [policy.json] [--json] Start virtual device & telemetry loop\n";
-    std::cout << "  vdevpulse status [--json]            Inspect current system telemetry\n";
-    std::cout << "  vdevpulse top [limit]                Inspect top resource-consuming processes\n";
-    std::cout << "  vdevpulse history                    Display accumulated telemetry history\n";
-    std::cout << "  vdevpulse query <CMD>                Query virtual device (GET_CPU, GET_MEM, GET_LOAD, GET_TOP, GET_JSON, GET_HEALTH, PING)\n";
-    std::cout << "  vdevpulse write <message>            Write payload to virtual device node\n";
-    std::cout << "  vdevpulse ioctl <start|stop|reset|stats> Send IOCTL command to virtual device\n";
-    std::cout << "------------------------------------------------------\n";
+    std::cout << "  vdevpulse menu [policy.json]         Launch live non-blocking visual TUI dashboard\n";
+    std::cout << "  vdevpulse run [policy.json] [--json] Start continuous daemon stream to /tmp/vdevpulse\n";
+    std::cout << "  vdevpulse status [--json]            Inspect current system telemetry & health\n";
+    std::cout << "  vdevpulse top [limit]                Inspect top resource-consuming background processes\n";
+    std::cout << "  vdevpulse history                    Display accumulated telemetry sample ring buffer\n";
+    std::cout << "  vdevpulse query <OPCODE>             Query virtual device (GET_CPU, GET_MEM, GET_LOAD, GET_TOP, GET_JSON, GET_HEALTH, PING)\n";
+    std::cout << "  vdevpulse write <message>            Write custom diagnostic payload to /tmp/vdevpulse\n";
+    std::cout << "  vdevpulse ioctl <start|stop|reset|stats> Send IOCTL command to virtual character device\n";
+    std::cout << "  vdevpulse --help | -h                Display this help and CLI reference guide\n";
+    std::cout << "--------------------------------------------------------------------------------\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -44,6 +45,11 @@ int main(int argc, char* argv[]) {
     }
 
     std::string cmd = argv[1];
+
+    if (cmd == "--help" || cmd == "-h" || cmd == "help") {
+        printUsage();
+        return 0;
+    }
 
     if (cmd == "menu" || cmd == "tui" || cmd == "dashboard" || cmd == "--interactive") {
         VDevConfig config;
@@ -116,12 +122,21 @@ int main(int argc, char* argv[]) {
     }
 
     if (cmd == "top") {
-        auto procs = TelemetryMonitor::getTopProcesses(5);
-        std::cout << "======================================================\n";
-        std::cout << "        TOP PROCESSES BY MEMORY CONSUMPTION           \n";
-        std::cout << "======================================================\n";
+        size_t limit = 5;
+        if (argc > 2) {
+            try {
+                limit = std::stoul(argv[2]);
+                if (limit == 0) limit = 5;
+            } catch (...) {
+                limit = 5;
+            }
+        }
+        auto procs = TelemetryMonitor::getTopProcesses(limit);
+        std::cout << "================================================================================\n";
+        std::cout << "        TOP " << limit << " RESOURCE-CONSUMING PROCESSES BY PHYSICAL RAM (RSS)  \n";
+        std::cout << "================================================================================\n";
         std::cout << "PID     NAME                    RAM (MB)\n";
-        std::cout << "------------------------------------------------------\n";
+        std::cout << "--------------------------------------------------------------------------------\n";
         for (const auto& p : procs) {
             std::cout << p.pid << "\t" << p.name;
             if (p.name.length() < 8) std::cout << "\t\t\t";
@@ -129,7 +144,7 @@ int main(int argc, char* argv[]) {
             else std::cout << "\t";
             std::cout << p.memory_rss_mb << " MB\n";
         }
-        std::cout << "------------------------------------------------------\n";
+        std::cout << "--------------------------------------------------------------------------------\n";
         return 0;
     }
 
