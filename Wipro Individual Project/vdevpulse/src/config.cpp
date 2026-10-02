@@ -7,12 +7,18 @@
 namespace fs = std::filesystem;
 
 bool ConfigParser::loadPolicy(const std::string& filepath, VDevConfig& config) {
-    if (!fs::exists(filepath)) {
-        Logger::getInstance().log(LogLevel::WARNING, "Policy configuration file not found: " + filepath + ", using default configuration.");
-        return true;
+    std::string actual_path = filepath;
+    if (!fs::exists(actual_path)) {
+        std::string fallback = "../" + filepath;
+        if (fs::exists(fallback)) {
+            actual_path = fallback;
+        } else {
+            Logger::getInstance().log(LogLevel::WARNING, "Policy configuration file not found: " + filepath + ", using default configuration.");
+            return true;
+        }
     }
 
-    std::ifstream file(filepath);
+    std::ifstream file(actual_path);
     if (!file.is_open()) return false;
 
     std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
