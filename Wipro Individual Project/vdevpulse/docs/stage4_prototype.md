@@ -61,7 +61,11 @@ vdevpulse/
 - **Virtual Character Device**: Creates named FIFO at `/tmp/vdevpulse` via `mkfifo()`.
 - **Non-Blocking I/O**: Opens with `O_RDWR | O_NONBLOCK` to allow non-blocking writes.
 - **Query Protocol**: `processQueryCommand()` handles targeted queries (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_TOP`, `GET_JSON`, `GET_HEALTH`, `PING`).
-- **Extended IOCTLs**: Handles `START`, `STOP`, `RESET`, `GET_STATS`, and `SET_RATE` while maintaining cumulative `DeviceStats`.
+### 4.2.5 TuiDashboard — `tui_dashboard.hpp` / `tui_dashboard.cpp`
+- **Interactive Visual TUI Control Center**: Pure zero-dependency ANSI/Unicode live terminal dashboard (`vdevpulse menu`).
+- **Non-Blocking Asynchronous Loop**: Uses POSIX `poll()` and raw `termios` to enable instantaneous hotkey responses (`1-8`, `T`, `S`, `+`, `-`, `Q`) during continuous live telemetry auto-refresh.
+- **Visual Gaugemetry**: Renders solid Unicode shaded progress meters (`█░`), health status badges, system load, uptime, and virtual device counters with exact 80-column alignment.
+- **Embedded Diagnostic Harness**: Built-in traffic injector (`[T]`), IOCTL state toggling (`[S]`), live alert threshold adjustment (`[+]` / `[-]`), and historical trend sparklines (`[5]`).
 
 ---
 
@@ -69,6 +73,7 @@ vdevpulse/
 
 | Command | Syntax | Behaviour |
 | :--- | :--- | :--- |
+| `menu` | `vdevpulse menu` | Launches interactive visual TUI control center with non-blocking hotkeys |
 | `run` | `vdevpulse run [policy.json] [--json]` | Continuous daemon loop streaming telemetry (text or JSON) to `/tmp/vdevpulse` |
 | `status` | `vdevpulse status [--json]` | Instantaneous telemetry snapshot (dashboard or JSON format) |
 | `top` | `vdevpulse top [limit]` | Live inspection of top background processes by memory consumption (default: 5) |

@@ -2,19 +2,26 @@
 
 VDevPulse is a high-performance C++17 system daemon that bridges Linux POSIX virtual character device I/O with kernel hardware telemetry monitoring (`/proc`).
 
+---
+
 ## Architecture & Features
 
-- **POSIX Virtual Device Driver Emulation**: Creates and manages FIFO stream channels simulating `/dev/vdevpulse` for non-blocking asynchronous user-space communication.
+- **POSIX Virtual Character Driver Emulation**: Creates and manages FIFO stream channels simulating `/dev/vdevpulse` for non-blocking asynchronous user-space communication.
+- **Interactive Real-Time TUI Control Center**: Zero-dependency ANSI/Unicode live terminal dashboard (`./vdevpulse menu`) featuring live CPU/RAM progress meters, system health status, and non-blocking instant hotkeys.
 - **Kernel Telemetry Parser**: Monitors CPU utilization, RAM consumption, and uptime in real-time from kernel synthetic filesystems (`/proc/stat`, `/proc/meminfo`, `/proc/uptime`).
 - **System Load & Process Tracking**: Extracts 1m, 5m, 15m load averages and active/total thread counts from `/proc/loadavg`.
-- **Top Resource-Consuming Process Scanner**: Scans `/proc/[PID]/comm` and `/proc/[PID]/status` to isolate the top memory/CPU consumer daemons in real time.
-- **Automated Threshold Alert Engine**: Policy-driven rule evaluation firing alerts and tagging system health state (`HEALTHY`, `WARNING_CPU_OVERLOAD`, `WARNING_MEMORY_PRESSURE`).
+- **Top Resource-Consuming Process Scanner**: Scans `/proc/[PID]/comm` and `/proc/[PID]/status` to isolate top memory/CPU consumer daemons in real time.
+- **Automated Threshold Alert Engine**: Policy-driven rule evaluation firing alerts and tagging system health state (`HEALTHY`, `WARNING_CPU_OVERLOAD`, `WARNING_MEMORY_PRESSURE`, `CRITICAL_RESOURCE_PRESSURE`).
+- **Dynamic Threshold Tuning**: Instant runtime policy threshold adjustments (`+` / `-` hotkeys) with live health badge transitions.
 - **Interactive Device Query Protocol**: Supports targeted query commands (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_TOP`, `GET_JSON`, `GET_HEALTH`, `PING`) over device streams.
+- **Live Traffic Burst Test Harness**: Built-in traffic injector (`[T]` hotkey) to stress-test FIFO packet pipelines and verify I/O throughput in real time.
+- **Driver IOCTL Lifecycle State Machine**: Full driver state control (`RUNNING`, `PAUSED`, `STOPPED`) with state toggling (`[S]` hotkey) and runtime statistics accounting (`VDEV_IOCTL_START`, `STOP`, `RESET`, `GET_STATS`).
+- **Historical Ring Buffer & ASCII Sparklines**: In-memory circular buffer with chronological ASCII trend sparklines for CPU and memory telemetry trajectories.
 - **Structured JSON Streaming**: Export live metrics as compact JSON objects for direct integration with web dashboards or analytics tools.
-- **Historical Ring Buffer**: In-memory circular buffer preserving recent telemetry snapshots.
-- **Extended IOCTL Suite**: Virtual IOCTL commands (`START`, `STOP`, `RESET`, `GET_STATS`, `SET_RATE`) and runtime statistics accounting.
-- **Thread-Safe Logging**: Synchronized multi-threaded logging system supporting debug, info, warning, error, and device severity levels.
-- **Unit Testing**: Suite powered by standard C++ test fixtures with 100% CTest pass rate.
+- **Thread-Safe Logging Engine**: Synchronized multi-threaded logging system supporting debug, info, warning, error, and device severity levels.
+- **Automated Unit Testing Suite**: 100% CTest pass rate across character device simulation and telemetry monitoring test suites.
+
+---
 
 ## System Requirements
 
@@ -22,6 +29,8 @@ VDevPulse is a high-performance C++17 system daemon that bridges Linux POSIX vir
 - C++17 compliant compiler (`g++` >= 9.0 or `clang++` >= 10.0)
 - CMake 3.14+
 - Make or Ninja build toolchain
+
+---
 
 ## Quick Start & Build Instructions
 
@@ -35,46 +44,94 @@ mkdir -p build && cd build
 cmake ..
 make -j$(nproc)
 
-# Execute test suite
+# Execute automated test suite
 ctest --output-on-failure
 ```
 
-## CLI Usage Guide
+---
 
-### 1. Launch Interactive Visual TUI Control Center
-Opens the interactive terminal dashboard with real-time gauges, top process inspector, query dispatcher, and IOCTL control buttons in your terminal:
+## Interactive TUI Control Center (`./vdevpulse menu`)
+
+Launch the real-time non-blocking terminal dashboard:
 ```bash
 ./vdevpulse menu
 ```
 *(Also accessible via `./vdevpulse tui` or `./vdevpulse dashboard`)*
 
-### 2. Launch Continuous Daemon Loop
+### **Live Dashboard Interface**
+```text
+╔══════════════════════════════════════════════════════════════════════════════╗
+║     VDevPulse v1.0 -- Linux Virtual Device & System Telemetry Center         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+  Node: /tmp/vdevpulse │ CPU Alert: 85% │ RAM Alert: 90% │ Rate: 1000ms         
+┌── [ LIVE HARDWARE & SYSTEM TELEMETRY (AUTO-REFRESHING) ] ────────────────────┐
+│ System Health : ● [ HEALTHY ]              System Uptime : 1h 8m 46s (4126s) │
+│ CPU Usage  [░░░░░░░░░░░░░░░░░░░░]   0.9%    Load (1/5/15) : 0.44, 0.21, 0.11 │
+│ RAM Memory [█░░░░░░░░░░░░░░░░░░░]   7.2%   Active Tasks  : 1 run / 183 total │
+│ RAM Allocation: 570 MB used / 7942 MB total                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+┌── [ LIVE VIRTUAL DEVICE TELEMETRY (/tmp/vdevpulse) ] ────────────────────────┐
+│ Driver State  : RUNNING (Active)                   Bytes Processed : 0 Bytes │
+│ Driver I/O Ops : 0 reads, 0 queries                IOCTL Operations: 1 calls │
+└──────────────────────────────────────────────────────────────────────────────┘
+┌── [ ACTION CONTROLS & DIAGNOSTICS (PRESS HOTKEY INSTANTLY) ] ────────────────┐
+│ [1] Scan Top Heavy Processes         │ [2] Device IOCTL Command Control      │
+│ [3] Synchronous Query Protocol (M2M) │ [4] Write Custom Payload to Device    │
+│ [5] History Buffer & Sparklines      │ [6] Cycle Refresh Rate (500-2000ms)   │
+│ [7] Structured JSON Telemetry Export │ [8] View Policy Configuration         │
+│ [T] Inject Traffic Burst (10 Pkts)   │ [S] Toggle Driver State (RUN/PAUSE)   │
+│ [+]/[-] Adjust CPU Alert Threshold   │ [Q] Exit Control Center to Shell      │
+└──────────────────────────────────────────────────────────────────────────────┘
+● [LIVE RUNNING] Hotkeys [1-8, T, S, +, -, Q] (No Enter required):
+```
+
+### **Instant Hotkey Reference**
+| Hotkey | Action | Description |
+| :---: | :--- | :--- |
+| `[1]` | **Top Processes** | Scans `/proc` and displays top 10 memory-consuming processes. |
+| `[2]` | **IOCTL Control** | Dispatches kernel IOCTL commands (`START`, `STOP`, `RESET`, `GET_STATS`). |
+| `[3]` | **Query Protocol (M2M)** | Dispatches targeted query opcodes (`GET_CPU`, `GET_MEM`, `PING`, etc.). |
+| `[4]` | **Write Payload** | Sends custom payload strings directly to `/tmp/vdevpulse`. |
+| `[5]` | **History & Sparklines** | Displays 60-sample history buffer with ASCII trend sparklines. |
+| `[6]` | **Cycle Rate** | Cycles live update frequency between **500ms**, **1000ms**, and **2000ms**. |
+| `[7]` | **JSON Export** | Dumps structured JSON telemetry snapshot. |
+| `[8]` | **Policy Config** | Displays active thresholds and rule evaluation matrix. |
+| `[T]` | **Traffic Burst** | Injects a 10-packet burst into the virtual character device pipeline. |
+| `[S]` | **Toggle State** | Toggles virtual driver between `RUNNING (Active)` $\longleftrightarrow$ `PAUSED (Standby)`. |
+| `[+]` / `[-]` | **Adjust Alert Limit** | Dynamically modifies CPU alert threshold (triggers live `HEALTHY` $\leftrightarrow$ `WARNING`). |
+| `[Q]` | **Exit** | Cleanly closes device descriptors and restores terminal cursor. |
+
+---
+
+## CLI Commands Guide
+
+### 1. Launch Continuous Daemon Loop
 Starts the live telemetry monitor and creates the virtual character device at `/tmp/vdevpulse`:
 ```bash
 ./vdevpulse run ../configs/vdev_policy.json
 ```
 *(Supports `--json` for JSON output format. Press `Ctrl + C` for graceful shutdown)*
 
-### 3. Read Telemetry Stream (Client Terminal)
+### 2. Read Telemetry Stream (Client Terminal)
 While the daemon is running, open a separate terminal to read live telemetry directly from the virtual device node:
 ```bash
 cat /tmp/vdevpulse
 # Output: TELEMETRY_SAMPLE HEALTH=HEALTHY CPU=14.37% MEM=7142MB LOAD=0.45
 ```
 
-### 4. Query Single Telemetry Snapshot
+### 3. Query Single Telemetry Snapshot
 ```bash
 ./vdevpulse status
 # Or output in JSON format:
 ./vdevpulse status --json
 ```
 
-### 5. Inspect Top Resource-Consuming Processes
+### 4. Inspect Top Resource-Consuming Processes
 ```bash
 ./vdevpulse top 5
 ```
 
-### 6. Interactive Device Queries
+### 5. Interactive Device Queries
 ```bash
 ./vdevpulse query GET_CPU      # Output: CPU_PCT=14.37
 ./vdevpulse query GET_MEM      # Output: MEM_USED=7142MB (44.7%)
@@ -85,12 +142,12 @@ cat /tmp/vdevpulse
 ./vdevpulse query PING         # Output: PONG
 ```
 
-### 7. Inspect Historical Telemetry Buffer
+### 6. Inspect Historical Telemetry Buffer
 ```bash
 ./vdevpulse history
 ```
 
-### 8. Send Virtual IOCTL Control Commands
+### 7. Send Virtual IOCTL Control Commands
 ```bash
 ./vdevpulse ioctl start    # Set virtual device state to RUNNING
 ./vdevpulse ioctl stop     # Set virtual device state to STOPPED
@@ -98,42 +155,29 @@ cat /tmp/vdevpulse
 ./vdevpulse ioctl stats    # Query cumulative I/O statistics
 ```
 
-### 9. Write Payload to Virtual Device
+### 8. Write Payload to Virtual Device
 ```bash
 ./vdevpulse write "PING_DIAGNOSTIC_SIGNAL"
 ```
 
-### CLI Command Summary
+---
+
+## CLI Command Summary
 
 | Command | Description |
 | :--- | :--- |
 | `./vdevpulse` | Displays usage and help menu |
-| `./vdevpulse menu` | Launches the interactive visual TUI control center with button menus |
+| `./vdevpulse menu` | Launches the interactive visual TUI control center with non-blocking hotkeys |
 | `./vdevpulse run [policy.json] [--json]` | Starts the continuous live daemon loop (text or JSON format) |
 | `./vdevpulse status [--json]` | Displays an instantaneous CPU, RAM, Load, Top Processes, and Health snapshot |
-| `./vdevpulse top` | Displays the top 5 memory-consuming processes |
+| `./vdevpulse top [limit]` | Displays top resource-consuming background processes |
 | `./vdevpulse history` | Displays the circular ring buffer of recent telemetry samples |
 | `./vdevpulse query <CMD>` | Queries targeted metrics (`GET_CPU`, `GET_MEM`, `GET_LOAD`, `GET_TOP`, `GET_JSON`, `GET_HEALTH`, `PING`) |
 | `./vdevpulse ioctl <start\|stop\|reset\|stats>` | Sends an IOCTL state or stats command |
 | `./vdevpulse write <message>` | Writes a custom payload string to the virtual device node |
 | `cat /tmp/vdevpulse` | Reads real-time telemetry stream from the device node |
 
-## Execution Screenshots & Live Demonstration
-
-### 1. Continuous Daemon Streaming & Telemetry Dashboard
-![Continuous Daemon Streaming](docs/screenshots/vdevpulse_daemon_stream.png)
-
-### 2. Instantaneous JSON Export (`status --json`)
-![Structured JSON Output](docs/screenshots/vdevpulse_status_json.png)
-
-### 3. Top Background Process Inspector (`top 5`)
-![Top Background Process Scanner](docs/screenshots/vdevpulse_top_processes.png)
-
-### 4. Interactive Synchronous Query Protocol (`query <CMD>`)
-![Interactive Query Protocol](docs/screenshots/vdevpulse_queries.png)
-
-### 5. In-Memory Historical Telemetry Ring Buffer (`history`)
-![Historical Ring Buffer](docs/screenshots/vdevpulse_history.png)
+---
 
 ## Documentation
 
@@ -149,6 +193,8 @@ Full SDLC documentation and architecture diagrams are also available across the 
 - [Stage 5: Verification & Testing Report](docs/stage5_testing.md)
 - [Stage 6: Final Deployment & Maintenance Report](docs/stage6_final_report.md)
 - [Executive Technical Presentation Guide](docs/project_presentation_guide.md)
+
+---
 
 ## License
 

@@ -53,7 +53,8 @@ VDevPulse is structured as a modular, single-process daemon with four loosely-co
 | **Policy Engine** | `ConfigParser`, `VDevConfig` | Load runtime settings, thresholds, and format from `vdev_policy.json` |
 | **Telemetry Engine** | `TelemetryMonitor`, `SystemTelemetry` | Parse `/proc` kernel FS; compute CPU%, RAM%, loadavg, health status; JSON serialization; history buffer |
 | **Device Manager** | `DeviceManager`, `DeviceState`, `DeviceStats` | Create/open/read/write/close FIFO; process interactive query commands; handle IOCTL state & stats |
-| **Daemon Entry Point** | `main()` | CLI dispatch (`run`, `status`, `history`, `query`, `write`, `ioctl`), signal handling |
+| **TUI Dashboard** | `TuiDashboard` | Interactive Unicode/ANSI terminal control center with real-time non-blocking loop & hotkey dispatch |
+| **Daemon Entry Point** | `main()` | CLI dispatch (`menu`, `run`, `status`, `history`, `query`, `write`, `ioctl`), signal handling |
 
 ---
 
