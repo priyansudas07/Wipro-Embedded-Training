@@ -23,6 +23,7 @@ Functional requirements define the specific behaviours and capabilities the syst
 | **FR-15** | `ConfigParser` | The system shall load device configuration, threshold limits, and output format from a JSON policy file with safe fallback to compiled defaults. | Medium |
 | **FR-16** | `Logger` | The system shall provide five log severity levels (`INFO`, `SUCCESS`, `WARNING`, `ERROR`, `DEVICE`) with thread safety (`std::mutex` + RAII). | High |
 | **FR-17** | `Main Daemon` | The system shall handle `SIGINT` and `SIGTERM` signals for clean daemon exit and RAII device node cleanup. | High |
+| **FR-18** | `TuiDashboard` | The system shall provide an interactive ANSI/Unicode TUI control center (`vdevpulse menu`) using POSIX `poll()` for non-blocking live refresh, traffic bursts (`[T]`), IOCTL toggles (`[S]`), alert threshold adjustments (`[+]`/`[-]`), and ASCII trend sparklines. | High |
 
 ---
 
@@ -47,9 +48,10 @@ Functional requirements define the specific behaviours and capabilities the syst
 | :--- | :--- | :--- |
 | `Logger` | `logger.hpp`, `logger.cpp` | Singleton thread-safe logging with ANSI color support |
 | `ConfigParser` + `VDevConfig` | `config.hpp`, `config.cpp` | JSON policy file parsing with threshold rules |
-| `TelemetryMonitor` + `SystemTelemetry` | `telemetry_monitor.hpp`, `telemetry_monitor.cpp` | `/proc` telemetry collection, loadavg, health status, JSON export, and history ring buffer |
+| `TelemetryMonitor` + `SystemTelemetry` | `telemetry_monitor.hpp`, `telemetry_monitor.cpp` | `/proc` telemetry collection, loadavg, top processes, health status, JSON export, and history ring buffer |
 | `DeviceManager` | `device_manager.hpp`, `device_manager.cpp` | POSIX FIFO lifecycle, query protocol, IOCTL state machine, and I/O statistics |
-| Main Daemon | `main.cpp` | CLI argument dispatch (`run`, `status`, `history`, `query`, `write`, `ioctl`), signal handling |
+| `TuiDashboard` | `tui_dashboard.hpp`, `tui_dashboard.cpp` | Non-blocking ANSI/Unicode TUI dashboard with live stream, traffic injection, and instant hotkey dispatch |
+| Main Daemon | `main.cpp` | CLI argument dispatch (`menu`, `run`, `status`, `top`, `history`, `query`, `write`, `ioctl`), signal handling |
 | Unit Tests | `device_test.cpp`, `telemetry_test.cpp` | CTest-integrated automated verification |
 | Policy Config | `configs/vdev_policy.json` | Runtime device, threshold, and output format configuration |
 | Build System | `CMakeLists.txt` | CMake 3.14+ build and CTest target configuration |
