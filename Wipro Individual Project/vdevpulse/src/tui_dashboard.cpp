@@ -12,6 +12,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <poll.h>
 #endif
 
 namespace {
@@ -27,32 +28,57 @@ namespace {
     const std::string ANSI_MAGENTA = "\033[35m";
     const std::string ANSI_WHITE   = "\033[37m";
 
-    // Non-blocking key hit for Linux terminal
-    bool kbhit_linux() {
+    class TerminalMode {
+    public:
+        static void setRawMode() {
 #ifdef __linux__
-        struct termios oldt, newt;
-        int ch;
-        int oldf;
-
-        tcgetattr(STDIN_FILENO, &oldt);
-        newt = oldt;
-        newt.c_lflag &= ~(ICANON | ECHO);
-        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-        oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
-        fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
-
-        ch = getchar();
-
-        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-        fcntl(STDIN_FILENO, F_SETFL, oldf);
-
-        if (ch != EOF) {
-            ungetc(ch, stdin);
-            return true;
-        }
+            if (!isatty(STDIN_FILENO)) return;
+            tcgetattr(STDIN_FILENO, &orig_termios);
+            struct termios raw = orig_termios;
+            raw.c_lflag &= ~(ICANON | ECHO);
+            tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+            raw_active = true;
 #endif
-        return false;
-    }
+        }
+
+        static void restoreMode() {
+#ifdef __linux__
+            if (raw_active && isatty(STDIN_FILENO)) {
+                tcsetattr(STDIN_FILENO, TCSANOW, &orig_termios);
+                raw_active = false;
+            }
+#endif
+        }
+
+        static char readKeyTimeout(int timeout_ms) {
+#ifdef __linux__
+            if (!isatty(STDIN_FILENO)) {
+                char c = 0;
+                if (std::cin >> c) return c;
+                return 'q';
+            }
+            struct pollfd pfd;
+            pfd.fd = STDIN_FILENO;
+            pfd.events = POLLIN;
+            int ret = poll(&pfd, 1, timeout_ms);
+            if (ret > 0 && (pfd.revents & POLLIN)) {
+                char c = 0;
+                if (read(STDIN_FILENO, &c, 1) == 1) {
+                    return c;
+                }
+            }
+#else
+            std::this_thread::sleep_for(std::chrono::milliseconds(timeout_ms));
+#endif
+            return 0;
+        }
+
+    private:
+#ifdef __linux__
+        inline static struct termios orig_termios;
+        inline static bool raw_active = false;
+#endif
+    };
 }
 
 void TuiDashboard::clearScreen() {
@@ -71,7 +97,7 @@ void TuiDashboard::renderHeader(const VDevConfig& config) {
     pbar << "Node: " << config.device_path 
          << " | CPU Alert: " << std::fixed << std::setprecision(0) << config.cpu_alert_threshold_pct << "%"
          << " | RAM Alert: " << config.memory_alert_threshold_pct << "%"
-         << " | Sample: " << config.sampling_rate_ms << "ms";
+         << " | Auto-Refresh: " << config.sampling_rate_ms << "ms";
     std::string pstr = pbar.str();
     if (pstr.length() < 76) {
         pstr.append(76 - pstr.length(), ' ');
@@ -113,7 +139,7 @@ void TuiDashboard::renderLiveTelemetryPanel(const SystemTelemetry& t, const Devi
 
     // 1. LIVE HARDWARE TELEMETRY BOX
     std::cout << ANSI_BOLD << ANSI_CYAN
-              << "+-- [ LIVE HARDWARE & SYSTEM TELEMETRY ] --------------------------------------+\n"
+              << "+-- [ LIVE HARDWARE & SYSTEM TELEMETRY (AUTO-REFRESHING) ] -------------------+\n"
               << ANSI_RESET;
     
     // Line 1: Health & Uptime (76 chars inner)
@@ -136,7 +162,7 @@ void TuiDashboard::renderLiveTelemetryPanel(const SystemTelemetry& t, const Devi
     std::string load_str = load_ss.str();
     
     std::cout << "| ";
-    renderProgressBar("CPU Usage", t.cpu_usage_pct, 20); // 11 + 1 + 20 + 2 + 6 = 40 chars
+    renderProgressBar("CPU Usage", t.cpu_usage_pct, 20); // 40 chars
     int spaces_l2 = 76 - 40 - (int)load_str.length();
     if (spaces_l2 < 1) spaces_l2 = 1;
     std::cout << std::string(spaces_l2, ' ') << load_str << " |\n";
@@ -202,22 +228,23 @@ void TuiDashboard::renderLiveTelemetryPanel(const SystemTelemetry& t, const Devi
 
 void TuiDashboard::renderActionControlsMenu() {
     std::cout << ANSI_BOLD << ANSI_MAGENTA
-              << "+-- [ ACTION CONTROLS & DIAGNOSTICS (NON-LIVE COMMANDS) ] ---------------------+\n"
+              << "+-- [ ACTION CONTROLS & DIAGNOSTICS (PRESS KEY INSTANTLY) ] -------------------+\n"
               << ANSI_RESET
               << "| " << ANSI_YELLOW << ANSI_BOLD << "[1]" << ANSI_RESET << " Scan Top Memory Heavy Processes   | "
               << ANSI_YELLOW << ANSI_BOLD << "[2]" << ANSI_RESET << " Device IOCTL Command Control       |\n"
               << "| " << ANSI_YELLOW << ANSI_BOLD << "[3]" << ANSI_RESET << " Synchronous Query Protocol (M2M)  | "
               << ANSI_YELLOW << ANSI_BOLD << "[4]" << ANSI_RESET << " Write Custom Payload to Device     |\n"
               << "| " << ANSI_YELLOW << ANSI_BOLD << "[5]" << ANSI_RESET << " View 60-Sample History Buffer     | "
-              << ANSI_YELLOW << ANSI_BOLD << "[6]" << ANSI_RESET << " Real-Time Auto-Refresh Stream      |\n"
+              << ANSI_YELLOW << ANSI_BOLD << "[6]" << ANSI_RESET << " Cycle Auto-Refresh Rate (Speed)    |\n"
               << "| " << ANSI_YELLOW << ANSI_BOLD << "[7]" << ANSI_RESET << " Structured JSON Telemetry Export   | "
               << ANSI_YELLOW << ANSI_BOLD << "[8]" << ANSI_RESET << " View / Check Policy Configuration  |\n"
-              << "| " << ANSI_GREEN  << ANSI_BOLD << "[R]" << ANSI_RESET << " Refresh Live Telemetry Snapshot   | "
+              << "| " << ANSI_GREEN  << ANSI_BOLD << "[R]" << ANSI_RESET << " Force Immediate Refresh           | "
               << ANSI_RED    << ANSI_BOLD << "[Q]" << ANSI_RESET << " Exit Control Center to Shell       |\n"
               << ANSI_BOLD << ANSI_MAGENTA
               << "+------------------------------------------------------------------------------+\n"
               << ANSI_RESET;
-    std::cout << ANSI_BOLD << "Enter Action Choice [1-8, R, Q]: " << ANSI_RESET;
+    std::cout << ANSI_BOLD << ANSI_GREEN << "● [LIVE RUNNING]" << ANSI_RESET 
+              << ANSI_BOLD << " Press hotkey [1-8, R, Q] anytime (no Enter needed): " << ANSI_RESET << std::flush;
 }
 
 void TuiDashboard::showTopProcessesMenu() {
@@ -243,7 +270,7 @@ void TuiDashboard::showTopProcessesMenu() {
                   << std::setw(16) << (std::to_string(p.memory_rss_mb) + " MB")
                   << ANSI_GREEN << "Active" << ANSI_RESET << "\n";
     }
-    std::cout << "\nPress Enter to return to main dashboard...";
+    std::cout << "\nPress Enter to return to live dashboard...";
     std::cin.ignore(10000, '\n');
     std::cin.get();
 }
@@ -263,7 +290,7 @@ void TuiDashboard::showQueryMenu() {
     std::cout << "  [5] GET_HEALTH - Query policy rule evaluation status\n";
     std::cout << "  [6] PING       - Send driver heartbeat ping\n";
     std::cout << "  [7] Custom     - Send custom opcode string\n";
-    std::cout << "  [0] Return     - Back to Main Dashboard\n";
+    std::cout << "  [0] Return     - Back to Live Dashboard\n";
     std::cout << "\nChoose Query Opcode [0-7]: ";
 
     int choice = -1;
@@ -297,7 +324,7 @@ void TuiDashboard::showQueryMenu() {
     std::cout << "\n" << ANSI_GREEN << ANSI_BOLD << ">>> QUERY DISPATCHED : " << ANSI_RESET << queryCmd << "\n";
     std::cout << ANSI_CYAN << ANSI_BOLD  << "<<< DRIVER RESPONSE  : " << ANSI_RESET << response << "\n";
 
-    std::cout << "\nPress Enter to return to main dashboard...";
+    std::cout << "\nPress Enter to return to live dashboard...";
     std::cin.ignore(10000, '\n');
     std::cin.get();
 }
@@ -314,7 +341,7 @@ void TuiDashboard::showIoctlMenu(DeviceManager& dev) {
     std::cout << "  [2] STOP      (IOCTL 0x8002: Transition driver state to STOPPED)\n";
     std::cout << "  [3] RESET     (IOCTL 0x8003: Reset driver state & zero I/O statistics)\n";
     std::cout << "  [4] GET_STATS (IOCTL 0x8004: Query internal cumulative counters)\n";
-    std::cout << "  [0] Return to Main Dashboard\n";
+    std::cout << "  [0] Return to Live Dashboard\n";
     std::cout << "\nChoose IOCTL [0-4]: ";
 
     int choice = -1;
@@ -350,7 +377,7 @@ void TuiDashboard::showIoctlMenu(DeviceManager& dev) {
         default: return;
     }
 
-    std::cout << "\nPress Enter to return to main dashboard...";
+    std::cout << "\nPress Enter to return to live dashboard...";
     std::cin.ignore(10000, '\n');
     std::cin.get();
 }
@@ -363,7 +390,7 @@ void TuiDashboard::showHistoryMenu() {
               << "================================================================================\n"
               << ANSI_RESET;
     TelemetryMonitor::printHistory();
-    std::cout << "\nPress Enter to return to main dashboard...";
+    std::cout << "\nPress Enter to return to live dashboard...";
     std::cin.ignore(10000, '\n');
     std::cin.get();
 }
@@ -391,7 +418,7 @@ void TuiDashboard::showWritePayloadPrompt(DeviceManager& dev) {
         }
     }
 
-    std::cout << "\nPress Enter to return to main dashboard...";
+    std::cout << "\nPress Enter to return to live dashboard...";
     std::cin.get();
 }
 
@@ -414,38 +441,14 @@ void TuiDashboard::showPolicyConfigMenu(const VDevConfig& config) {
     std::cout << "  - Status is CRITICAL if CPU >= 95% OR RAM >= 95%\n";
     std::cout << "  - Status is HEALTHY  otherwise\n";
 
-    std::cout << "\nPress Enter to return to main dashboard...";
+    std::cout << "\nPress Enter to return to live dashboard...";
     std::cin.ignore(10000, '\n');
     std::cin.get();
 }
 
 void TuiDashboard::showLiveStreamMode(const VDevConfig& config, DeviceManager& dev) {
-    clearScreen();
-    std::cout << ANSI_BOLD << ANSI_CYAN << "Starting real-time live telemetry stream (rate: "
-              << config.sampling_rate_ms << "ms)..." << ANSI_RESET << "\n";
-    std::cout << "Press [Enter] anytime to pause stream and return to control center.\n\n";
-    
-    for (int frame = 1; frame <= 30; ++frame) {
-        clearScreen();
-        renderHeader(config);
-        auto t = TelemetryMonitor::collectTelemetry(config);
-        TelemetryMonitor::recordHistory(t);
-        renderLiveTelemetryPanel(t, dev, config);
-
-        std::cout << "\n" << ANSI_YELLOW << ANSI_BOLD
-                  << ">>> LIVE STREAMING (Frame #" << frame << " / 30) | Press Enter to return to menu..." 
-                  << ANSI_RESET << "\n";
-        
-        std::this_thread::sleep_for(std::chrono::milliseconds(config.sampling_rate_ms));
-        if (kbhit_linux()) {
-            std::cin.ignore(10000, '\n');
-            break;
-        }
-    }
-
-    std::cout << "\nStream paused. Press Enter to return to main dashboard...";
-    std::cin.ignore(10000, '\n');
-    std::cin.get();
+    (void)config;
+    (void)dev;
 }
 
 void TuiDashboard::runInteractiveLoop(const VDevConfig& config) {
@@ -453,37 +456,62 @@ void TuiDashboard::runInteractiveLoop(const VDevConfig& config) {
     dev.initDevice(config);
     dev.openDevice();
 
+    VDevConfig current_config = config;
+
+    // Initial clear screen
+    clearScreen();
+    std::cout << "\033[?25l" << std::flush; // Hide cursor for smooth flicker-free rendering
+
     bool running = true;
     while (running) {
-        clearScreen();
-        renderHeader(config);
+        // Redraw smoothly at top-left
+        std::cout << "\033[H" << std::flush;
         
-        auto currentTelemetry = TelemetryMonitor::collectTelemetry(config);
+        renderHeader(current_config);
+        
+        auto currentTelemetry = TelemetryMonitor::collectTelemetry(current_config);
         TelemetryMonitor::recordHistory(currentTelemetry);
-        renderLiveTelemetryPanel(currentTelemetry, dev, config);
+        renderLiveTelemetryPanel(currentTelemetry, dev, current_config);
 
         renderActionControlsMenu();
 
-        std::string choice;
-        if (!(std::cin >> choice)) {
-            break;
+        // Non-blocking wait for keypress with timeout equal to sampling_rate_ms
+        TerminalMode::setRawMode();
+        char key = TerminalMode::readKeyTimeout(current_config.sampling_rate_ms);
+        TerminalMode::restoreMode();
+
+        if (key == 0) {
+            // Timeout expired: loop naturally continues and re-renders live telemetry!
+            continue;
         }
 
-        if (choice == "r" || choice == "R") {
+        // Key was pressed: process action
+        std::cout << "\033[?25h" << std::flush; // Show cursor for sub-screens
+
+        if (key == 'r' || key == 'R') {
             continue;
-        } else if (choice == "1") {
+        } else if (key == '1') {
             showTopProcessesMenu();
-        } else if (choice == "2") {
+            clearScreen();
+        } else if (key == '2') {
             showIoctlMenu(dev);
-        } else if (choice == "3") {
+            clearScreen();
+        } else if (key == '3') {
             showQueryMenu();
-        } else if (choice == "4") {
+            clearScreen();
+        } else if (key == '4') {
             showWritePayloadPrompt(dev);
-        } else if (choice == "5") {
+            clearScreen();
+        } else if (key == '5') {
             showHistoryMenu();
-        } else if (choice == "6") {
-            showLiveStreamMode(config, dev);
-        } else if (choice == "7") {
+            clearScreen();
+        } else if (key == '6') {
+            // Cycle refresh speed: 500ms -> 1000ms -> 2000ms -> 500ms
+            if (current_config.sampling_rate_ms == 1000) current_config.sampling_rate_ms = 500;
+            else if (current_config.sampling_rate_ms == 500) current_config.sampling_rate_ms = 2000;
+            else current_config.sampling_rate_ms = 1000;
+            clearScreen();
+        } else if (key == '7') {
             clearScreen();
             std::cout << ANSI_BOLD << ANSI_CYAN
                       << "================================================================================\n"
@@ -491,16 +519,23 @@ void TuiDashboard::runInteractiveLoop(const VDevConfig& config) {
                       << "================================================================================\n"
                       << ANSI_RESET;
             std::cout << TelemetryMonitor::toJsonString(currentTelemetry) << "\n";
-            std::cout << "\nPress Enter to return to main dashboard...";
+            std::cout << "\nPress Enter to return to live dashboard...";
             std::cin.ignore(10000, '\n');
             std::cin.get();
-        } else if (choice == "8") {
-            showPolicyConfigMenu(config);
-        } else if (choice == "q" || choice == "Q" || choice == "0") {
+            clearScreen();
+        } else if (key == '8') {
+            showPolicyConfigMenu(current_config);
+            clearScreen();
+        } else if (key == 'q' || key == 'Q') {
             running = false;
         }
+
+        std::cout << "\033[?25l" << std::flush; // Hide cursor again for live loop
     }
 
+    // Restore terminal & cursor
+    TerminalMode::restoreMode();
+    std::cout << "\033[?25h" << std::flush;
     clearScreen();
     std::cout << ANSI_BOLD << ANSI_GREEN << "Exiting VDevPulse Control Center. Virtual device closed cleanly. Goodbye!\n" << ANSI_RESET;
 }
