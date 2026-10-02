@@ -2,6 +2,7 @@
 #include "vdevpulse/telemetry_monitor.hpp"
 #include "vdevpulse/logger.hpp"
 #include "vdevpulse/config.hpp"
+#include "vdevpulse/tui_dashboard.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -20,9 +21,10 @@ void printUsage() {
     std::cout << "  VDevPulse — Virtual Device & Telemetry Monitor      \n";
     std::cout << "======================================================\n";
     std::cout << "Usage:\n";
+    std::cout << "  vdevpulse menu                       Open interactive visual TUI control center\n";
     std::cout << "  vdevpulse run [policy.json] [--json] Start virtual device & telemetry loop\n";
     std::cout << "  vdevpulse status [--json]            Inspect current system telemetry\n";
-    std::cout << "  vdevpulse top                        Inspect top resource-consuming processes\n";
+    std::cout << "  vdevpulse top [limit]                Inspect top resource-consuming processes\n";
     std::cout << "  vdevpulse history                    Display accumulated telemetry history\n";
     std::cout << "  vdevpulse query <CMD>                Query virtual device (GET_CPU, GET_MEM, GET_LOAD, GET_TOP, GET_JSON, GET_HEALTH, PING)\n";
     std::cout << "  vdevpulse write <message>            Write payload to virtual device node\n";
@@ -42,6 +44,17 @@ int main(int argc, char* argv[]) {
     }
 
     std::string cmd = argv[1];
+
+    if (cmd == "menu" || cmd == "tui" || cmd == "dashboard" || cmd == "--interactive") {
+        VDevConfig config;
+        if (argc > 2 && argv[2][0] != '-') {
+            ConfigParser::loadPolicy(argv[2], config);
+        } else {
+            ConfigParser::loadPolicy("configs/vdev_policy.json", config);
+        }
+        TuiDashboard::runInteractiveLoop(config);
+        return 0;
+    }
 
     if (cmd == "run") {
         std::string config_file = "configs/vdev_policy.json";

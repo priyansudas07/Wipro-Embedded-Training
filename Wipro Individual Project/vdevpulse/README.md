@@ -41,33 +41,40 @@ ctest --output-on-failure
 
 ## CLI Usage Guide
 
-### 1. Launch Continuous Daemon Loop
+### 1. Launch Interactive Visual TUI Control Center
+Opens the interactive terminal dashboard with real-time gauges, top process inspector, query dispatcher, and IOCTL control buttons in your terminal:
+```bash
+./vdevpulse menu
+```
+*(Also accessible via `./vdevpulse tui` or `./vdevpulse dashboard`)*
+
+### 2. Launch Continuous Daemon Loop
 Starts the live telemetry monitor and creates the virtual character device at `/tmp/vdevpulse`:
 ```bash
 ./vdevpulse run ../configs/vdev_policy.json
 ```
 *(Supports `--json` for JSON output format. Press `Ctrl + C` for graceful shutdown)*
 
-### 2. Read Telemetry Stream (Client Terminal)
+### 3. Read Telemetry Stream (Client Terminal)
 While the daemon is running, open a separate terminal to read live telemetry directly from the virtual device node:
 ```bash
 cat /tmp/vdevpulse
 # Output: TELEMETRY_SAMPLE HEALTH=HEALTHY CPU=14.37% MEM=7142MB LOAD=0.45
 ```
 
-### 3. Query Single Telemetry Snapshot
+### 4. Query Single Telemetry Snapshot
 ```bash
 ./vdevpulse status
 # Or output in JSON format:
 ./vdevpulse status --json
 ```
 
-### 4. Inspect Top Resource-Consuming Processes
+### 5. Inspect Top Resource-Consuming Processes
 ```bash
-./vdevpulse top
+./vdevpulse top 5
 ```
 
-### 5. Interactive Device Queries
+### 6. Interactive Device Queries
 ```bash
 ./vdevpulse query GET_CPU      # Output: CPU_PCT=14.37
 ./vdevpulse query GET_MEM      # Output: MEM_USED=7142MB (44.7%)
@@ -78,12 +85,12 @@ cat /tmp/vdevpulse
 ./vdevpulse query PING         # Output: PONG
 ```
 
-### 6. Inspect Historical Telemetry Buffer
+### 7. Inspect Historical Telemetry Buffer
 ```bash
 ./vdevpulse history
 ```
 
-### 7. Send Virtual IOCTL Control Commands
+### 8. Send Virtual IOCTL Control Commands
 ```bash
 ./vdevpulse ioctl start    # Set virtual device state to RUNNING
 ./vdevpulse ioctl stop     # Set virtual device state to STOPPED
@@ -91,7 +98,7 @@ cat /tmp/vdevpulse
 ./vdevpulse ioctl stats    # Query cumulative I/O statistics
 ```
 
-### 8. Write Payload to Virtual Device
+### 9. Write Payload to Virtual Device
 ```bash
 ./vdevpulse write "PING_DIAGNOSTIC_SIGNAL"
 ```
@@ -101,6 +108,7 @@ cat /tmp/vdevpulse
 | Command | Description |
 | :--- | :--- |
 | `./vdevpulse` | Displays usage and help menu |
+| `./vdevpulse menu` | Launches the interactive visual TUI control center with button menus |
 | `./vdevpulse run [policy.json] [--json]` | Starts the continuous live daemon loop (text or JSON format) |
 | `./vdevpulse status [--json]` | Displays an instantaneous CPU, RAM, Load, Top Processes, and Health snapshot |
 | `./vdevpulse top` | Displays the top 5 memory-consuming processes |

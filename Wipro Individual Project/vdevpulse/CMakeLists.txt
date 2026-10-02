@@ -12,6 +12,7 @@ set(CORE_SOURCES
     src/config.cpp
     src/device_manager.cpp
     src/telemetry_monitor.cpp
+    src/tui_dashboard.cpp
 )
 
 add_library(vdevpulse_core STATIC ${CORE_SOURCES})
