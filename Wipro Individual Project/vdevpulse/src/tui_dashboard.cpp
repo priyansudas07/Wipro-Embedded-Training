@@ -7,6 +7,7 @@
 #include <atomic>
 #include <sstream>
 #include <vector>
+#include <deque>
 
 #ifdef __linux__
 #include <termios.h>
@@ -92,12 +93,12 @@ void TuiDashboard::renderHeader(const VDevConfig& config) {
               << "================================================================================\n"
               << ANSI_RESET;
     
-    // Policy Bar (80 columns: "  " + 76 chars + "  ")
+    // Subtitle Bar (exact 80 columns: "  " + 76 content + "  ")
     std::ostringstream pbar;
     pbar << "Node: " << config.device_path 
          << " | CPU Alert: " << std::fixed << std::setprecision(0) << config.cpu_alert_threshold_pct << "%"
          << " | RAM Alert: " << config.memory_alert_threshold_pct << "%"
-         << " | Auto-Refresh: " << config.sampling_rate_ms << "ms";
+         << " | Rate: " << config.sampling_rate_ms << "ms";
     std::string pstr = pbar.str();
     if (pstr.length() < 76) {
         pstr.append(76 - pstr.length(), ' ');
@@ -127,17 +128,17 @@ void TuiDashboard::renderProgressBar(const std::string& label, double pct, int w
 
 void TuiDashboard::renderLiveTelemetryPanel(const SystemTelemetry& t, const DeviceManager& dev, const VDevConfig& config) {
     (void)config;
-    std::string health_badge = ANSI_GREEN + ANSI_BOLD + "[ HEALTHY ]" + ANSI_RESET;
+    std::string health_badge = ANSI_GREEN + ANSI_BOLD + "● [ HEALTHY ]" + ANSI_RESET;
     std::string health_raw = "[ HEALTHY ]";
     if (t.health_status.find("CRITICAL") != std::string::npos) {
-        health_badge = ANSI_RED + ANSI_BOLD + "[ CRITICAL ]" + ANSI_RESET;
+        health_badge = ANSI_RED + ANSI_BOLD + "✖ [ CRITICAL ]" + ANSI_RESET;
         health_raw = "[ CRITICAL ]";
     } else if (t.health_status.find("WARNING") != std::string::npos) {
-        health_badge = ANSI_YELLOW + ANSI_BOLD + "[ WARNING ]" + ANSI_RESET;
+        health_badge = ANSI_YELLOW + ANSI_BOLD + "▲ [ WARNING ]" + ANSI_RESET;
         health_raw = "[ WARNING ]";
     }
 
-    // 1. LIVE HARDWARE TELEMETRY BOX
+    // 1. LIVE HARDWARE TELEMETRY BOX (80 width: + + 78 chars + +)
     std::cout << ANSI_BOLD << ANSI_CYAN
               << "+-- [ LIVE HARDWARE & SYSTEM TELEMETRY (AUTO-REFRESHING) ] -------------------+\n"
               << ANSI_RESET;
@@ -151,7 +152,7 @@ void TuiDashboard::renderLiveTelemetryPanel(const SystemTelemetry& t, const Devi
     std::string uptime_str = uptime_ss.str();
 
     std::cout << "| System Health : " << health_badge;
-    int spaces_l1 = 76 - (16 + (int)health_raw.length()) - (int)uptime_str.length();
+    int spaces_l1 = 76 - (18 + (int)health_raw.length()) - (int)uptime_str.length();
     if (spaces_l1 < 1) spaces_l1 = 1;
     std::cout << std::string(spaces_l1, ' ') << uptime_str << " |\n";
 
@@ -167,7 +168,7 @@ void TuiDashboard::renderLiveTelemetryPanel(const SystemTelemetry& t, const Devi
     if (spaces_l2 < 1) spaces_l2 = 1;
     std::cout << std::string(spaces_l2, ' ') << load_str << " |\n";
 
-    // Line 3: RAM Bar & Thread Count
+    // Line 3: RAM Bar & Active Tasks
     std::ostringstream proc_ss;
     proc_ss << "Active Tasks  : " << t.running_processes << " run / " << t.total_processes << " total";
     std::string proc_str = proc_ss.str();
@@ -193,7 +194,7 @@ void TuiDashboard::renderLiveTelemetryPanel(const SystemTelemetry& t, const Devi
     // 2. LIVE VIRTUAL DEVICE DRIVER TELEMETRY BOX
     auto stats = dev.getStats();
     std::string dev_state_str = (dev.getState() == DeviceState::RUNNING) ? "RUNNING (Active)" : 
-                                (dev.getState() == DeviceState::PAUSED)  ? "PAUSED" : "READY (Standby)";
+                                (dev.getState() == DeviceState::PAUSED)  ? "PAUSED (Standby)" : "STOPPED (Halted)";
     std::string dev_color = (dev.getState() == DeviceState::RUNNING) ? ANSI_GREEN : ANSI_YELLOW;
 
     std::cout << ANSI_BOLD << ANSI_BLUE
@@ -228,23 +229,25 @@ void TuiDashboard::renderLiveTelemetryPanel(const SystemTelemetry& t, const Devi
 
 void TuiDashboard::renderActionControlsMenu() {
     std::cout << ANSI_BOLD << ANSI_MAGENTA
-              << "+-- [ ACTION CONTROLS & DIAGNOSTICS (PRESS KEY INSTANTLY) ] -------------------+\n"
+              << "+-- [ ACTION CONTROLS & DIAGNOSTICS (PRESS HOTKEY INSTANTLY) ] ----------------+\n"
               << ANSI_RESET
-              << "| " << ANSI_YELLOW << ANSI_BOLD << "[1]" << ANSI_RESET << " Scan Top Memory Heavy Processes   | "
+              << "| " << ANSI_YELLOW << ANSI_BOLD << "[1]" << ANSI_RESET << " Scan Top Heavy Processes          | "
               << ANSI_YELLOW << ANSI_BOLD << "[2]" << ANSI_RESET << " Device IOCTL Command Control       |\n"
               << "| " << ANSI_YELLOW << ANSI_BOLD << "[3]" << ANSI_RESET << " Synchronous Query Protocol (M2M)  | "
               << ANSI_YELLOW << ANSI_BOLD << "[4]" << ANSI_RESET << " Write Custom Payload to Device     |\n"
-              << "| " << ANSI_YELLOW << ANSI_BOLD << "[5]" << ANSI_RESET << " View 60-Sample History Buffer     | "
-              << ANSI_YELLOW << ANSI_BOLD << "[6]" << ANSI_RESET << " Cycle Auto-Refresh Rate (Speed)    |\n"
+              << "| " << ANSI_YELLOW << ANSI_BOLD << "[5]" << ANSI_RESET << " History Buffer & Sparkline Graph  | "
+              << ANSI_YELLOW << ANSI_BOLD << "[6]" << ANSI_RESET << " Cycle Refresh Rate (500-2000ms)    |\n"
               << "| " << ANSI_YELLOW << ANSI_BOLD << "[7]" << ANSI_RESET << " Structured JSON Telemetry Export   | "
-              << ANSI_YELLOW << ANSI_BOLD << "[8]" << ANSI_RESET << " View / Check Policy Configuration  |\n"
-              << "| " << ANSI_GREEN  << ANSI_BOLD << "[R]" << ANSI_RESET << " Force Immediate Refresh           | "
+              << ANSI_YELLOW << ANSI_BOLD << "[8]" << ANSI_RESET << " View Policy Configuration Matrix   |\n"
+              << "| " << ANSI_CYAN   << ANSI_BOLD << "[T]" << ANSI_RESET << " Inject I/O Traffic Burst (10 Pkts)| "
+              << ANSI_CYAN   << ANSI_BOLD << "[S]" << ANSI_RESET << " Toggle Driver State (RUN/PAUSE)    |\n"
+              << "| " << ANSI_GREEN  << ANSI_BOLD << "[+]" << ANSI_RESET << "/" << ANSI_GREEN << ANSI_BOLD << "[-]" << ANSI_RESET << " Adjust CPU Alert Threshold   | "
               << ANSI_RED    << ANSI_BOLD << "[Q]" << ANSI_RESET << " Exit Control Center to Shell       |\n"
               << ANSI_BOLD << ANSI_MAGENTA
               << "+------------------------------------------------------------------------------+\n"
               << ANSI_RESET;
     std::cout << ANSI_BOLD << ANSI_GREEN << "● [LIVE RUNNING]" << ANSI_RESET 
-              << ANSI_BOLD << " Press hotkey [1-8, R, Q] anytime (no Enter needed): " << ANSI_RESET << std::flush;
+              << ANSI_BOLD << " Hotkeys [1-8, T, S, +, -, Q] (No Enter required): " << ANSI_RESET << std::flush;
 }
 
 void TuiDashboard::showTopProcessesMenu() {
@@ -389,6 +392,33 @@ void TuiDashboard::showHistoryMenu() {
               << "         HISTORICAL TELEMETRY BUFFER & METRIC LOGS (LAST 60 SAMPLES)            \n"
               << "================================================================================\n"
               << ANSI_RESET;
+
+    const auto& hist = TelemetryMonitor::getHistory();
+
+    // Render ASCII Sparklines for CPU and RAM trends
+    std::cout << ANSI_BOLD << ANSI_YELLOW << "\n--- TELEMETRY TREND SPARKLINES (CHRONOLOGICAL) ---\n" << ANSI_RESET;
+    std::cout << "CPU Trajectory : [";
+    for (const auto& sample : hist) {
+        double p = sample.cpu_usage_pct;
+        if (p < 10.0) std::cout << ANSI_GREEN << "_" << ANSI_RESET;
+        else if (p < 30.0) std::cout << ANSI_GREEN << "." << ANSI_RESET;
+        else if (p < 60.0) std::cout << ANSI_YELLOW << "=" << ANSI_RESET;
+        else if (p < 85.0) std::cout << ANSI_YELLOW << "+" << ANSI_RESET;
+        else std::cout << ANSI_RED << "#" << ANSI_RESET;
+    }
+    std::cout << "]\n";
+
+    std::cout << "RAM Trajectory : [";
+    for (const auto& sample : hist) {
+        double p = sample.memory_usage_pct;
+        if (p < 20.0) std::cout << ANSI_GREEN << "." << ANSI_RESET;
+        else if (p < 50.0) std::cout << ANSI_GREEN << "=" << ANSI_RESET;
+        else if (p < 80.0) std::cout << ANSI_YELLOW << "+" << ANSI_RESET;
+        else std::cout << ANSI_RED << "#" << ANSI_RESET;
+    }
+    std::cout << "]\n";
+    std::cout << "Legend: _=Idle(0-10%)  .=Low(10-30%)  ==Med(30-60%)  +=High(60-85%)  #=Alert(>85%)\n\n";
+
     TelemetryMonitor::printHistory();
     std::cout << "\nPress Enter to return to live dashboard...";
     std::cin.ignore(10000, '\n');
@@ -418,7 +448,7 @@ void TuiDashboard::showWritePayloadPrompt(DeviceManager& dev) {
         }
     }
 
-    std::cout << "\nPress Enter to return to live dashboard...";
+    std::cout << "\nPress Enter to return to main dashboard...";
     std::cin.get();
 }
 
@@ -441,7 +471,7 @@ void TuiDashboard::showPolicyConfigMenu(const VDevConfig& config) {
     std::cout << "  - Status is CRITICAL if CPU >= 95% OR RAM >= 95%\n";
     std::cout << "  - Status is HEALTHY  otherwise\n";
 
-    std::cout << "\nPress Enter to return to live dashboard...";
+    std::cout << "\nPress Enter to return to main dashboard...";
     std::cin.ignore(10000, '\n');
     std::cin.get();
 }
@@ -455,12 +485,13 @@ void TuiDashboard::runInteractiveLoop(const VDevConfig& config) {
     DeviceManager dev;
     dev.initDevice(config);
     dev.openDevice();
+    dev.sendIoctl(VDEV_IOCTL_START); // Start driver in active running state
 
     VDevConfig current_config = config;
 
     // Initial clear screen
     clearScreen();
-    std::cout << "\033[?25l" << std::flush; // Hide cursor for smooth flicker-free rendering
+    std::cout << "\033[?25l" << std::flush; // Hide cursor for smooth rendering
 
     bool running = true;
     while (running) {
@@ -490,6 +521,29 @@ void TuiDashboard::runInteractiveLoop(const VDevConfig& config) {
 
         if (key == 'r' || key == 'R') {
             continue;
+        } else if (key == 't' || key == 'T') {
+            // Inject a live traffic burst of 10 telemetry packets
+            for (int i = 1; i <= 10; ++i) {
+                std::string pkt = "VDEV_PKT#" + std::to_string(i) + " sample_cpu=" + std::to_string(currentTelemetry.cpu_usage_pct) + "%";
+                dev.writeData(pkt);
+                dev.processQueryCommand("PING", currentTelemetry);
+            }
+            dev.sendIoctl(VDEV_IOCTL_GET_STATS);
+        } else if (key == 's' || key == 'S') {
+            // Toggle driver state between RUNNING and PAUSED
+            if (dev.getState() == DeviceState::RUNNING) {
+                dev.sendIoctl(VDEV_IOCTL_STOP);
+            } else {
+                dev.sendIoctl(VDEV_IOCTL_START);
+            }
+        } else if (key == '+' || key == '=') {
+            // Increase CPU threshold (up to 100%)
+            current_config.cpu_alert_threshold_pct += 5.0;
+            if (current_config.cpu_alert_threshold_pct > 100.0) current_config.cpu_alert_threshold_pct = 100.0;
+        } else if (key == '-' || key == '_') {
+            // Decrease CPU threshold (down to 1%)
+            current_config.cpu_alert_threshold_pct -= 5.0;
+            if (current_config.cpu_alert_threshold_pct < 1.0) current_config.cpu_alert_threshold_pct = 1.0;
         } else if (key == '1') {
             showTopProcessesMenu();
             clearScreen();
