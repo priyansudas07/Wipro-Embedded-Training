@@ -179,6 +179,28 @@ cat /tmp/vdevpulse
 
 ---
 
+## Execution Screenshots & Live Demonstration
+
+### 1. Interactive Real-Time TUI Control Center (`./vdevpulse menu`)
+![Interactive TUI Control Center](docs/screenshots/vdevpulse_tui_dashboard.png)
+
+### 2. Continuous Daemon Streaming & Telemetry Dashboard (`./vdevpulse run`)
+![Continuous Daemon Streaming](docs/screenshots/vdevpulse_daemon_stream.png)
+
+### 3. Instantaneous JSON Export (`./vdevpulse status --json`)
+![Structured JSON Output](docs/screenshots/vdevpulse_status_json.png)
+
+### 4. Top Background Process Inspector (`./vdevpulse top 5`)
+![Top Background Process Scanner](docs/screenshots/vdevpulse_top_processes.png)
+
+### 5. Interactive Synchronous Query Protocol (`./vdevpulse query <CMD>`)
+![Interactive Query Protocol](docs/screenshots/vdevpulse_queries.png)
+
+### 6. In-Memory Historical Telemetry Ring Buffer (`./vdevpulse history`)
+![Historical Ring Buffer](docs/screenshots/vdevpulse_history.png)
+
+---
+
 ## Documentation
 
 - [Project Report - Complete Technical Defense (PDF - 6 Pages)](docs/VDevPulse_Project_Documentation.pdf)
